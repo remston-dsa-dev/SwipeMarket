@@ -1,77 +1,175 @@
+import { Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
-import { FlatList, View } from "react-native";
+import { CartItemRow } from "@/components/CartItemRow";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
-import { useMatches } from "@/hooks/useMatches";
+import { useCartStore } from "@/stores/cart-store";
 import { useTheme } from "@/theme/ThemeContext";
 
-export default function MatchesScreen() {
+export default function CartScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { data: matches = [], isLoading } = useMatches();
+  const items = useCartStore((s) => s.items);
+  const totalCents = useCartStore((s) => s.totalCents);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const clearCart = useCartStore((s) => s.clearCart);
+
+  const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
+
+  function handleCheckout() {
+    Alert.alert(
+      "Order placed!",
+      "Thanks for your purchase. Stripe payment integration coming soon.",
+      [
+        {
+          text: "Clear cart",
+          style: "destructive",
+          onPress: () => {
+            clearCart();
+            router.back();
+          },
+        },
+        { text: "Keep shopping", onPress: () => router.back() },
+      ],
+    );
+  }
 
   return (
     <Screen>
+      {/* Header */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 16,
+          marginBottom: 20,
         }}
       >
-        <ThemedText variant="headline">Matches</ThemedText>
-        <PressableScale
-          accessibilityLabel="Back to discover"
-          onPress={() => router.back()}
-          style={{
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: theme.radius.pill,
-            borderWidth: 1,
-            borderColor: theme.colors.glassBorder,
-            backgroundColor: theme.colors.overlay,
-          }}
-        >
-          <ThemedText variant="caption">Back</ThemedText>
-        </PressableScale>
-      </View>
-
-      {isLoading ? (
-        <ThemedText variant="body" color="muted">
-          Loading matches…
-        </ThemedText>
-      ) : null}
-
-      {!isLoading && matches.length === 0 ? (
-        <View style={{ gap: 8 }}>
-          <ThemedText variant="body" color="muted">
-            No matches yet — keep swiping to connect with suppliers.
-          </ThemedText>
+        <View style={{ gap: 4 }}>
+          <ThemedText variant="headline">Your Cart</ThemedText>
+          {itemCount > 0 && (
+            <ThemedText variant="caption" color="muted">
+              {itemCount} item{itemCount !== 1 ? "s" : ""}
+            </ThemedText>
+          )}
         </View>
-      ) : null}
 
-      {!isLoading && matches.length > 0 ? (
-        <FlatList
-          data={matches}
-          keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={({ item }) => (
-            <View
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          {items.length > 0 && (
+            <PressableScale
+              accessibilityLabel="Clear cart"
+              onPress={() =>
+                Alert.alert("Clear cart?", "Remove all items?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Clear", style: "destructive", onPress: clearCart },
+                ])
+              }
               style={{
-                padding: 14,
-                borderRadius: theme.radius.md,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: theme.radius.sm,
                 borderWidth: 1,
-                borderColor: theme.colors.glassBorder,
-                backgroundColor: theme.colors.overlay,
+                borderColor: "#EF4444",
               }}
             >
-              <ThemedText variant="body">{item.title}</ThemedText>
-            </View>
+              <ThemedText variant="caption" style={{ color: "#EF4444" }}>
+                Clear
+              </ThemedText>
+            </PressableScale>
           )}
-        />
-      ) : null}
+
+          <PressableScale
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: theme.radius.sm,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <ThemedText variant="caption">← Back</ThemedText>
+          </PressableScale>
+        </View>
+      </View>
+
+      {items.length === 0 ? (
+        /* Empty state */
+        <View style={{ flex: 1, justifyContent: "center", gap: 14 }}>
+          <ThemedText variant="headline">Nothing here yet</ThemedText>
+          <ThemedText variant="body" color="muted">
+            Swipe right on listings you love and set the quantity — they'll
+            appear here.
+          </ThemedText>
+          <PressableScale
+            accessibilityLabel="Start swiping"
+            onPress={() => router.back()}
+            style={{
+              alignSelf: "flex-start",
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              borderRadius: theme.radius.md,
+              backgroundColor: theme.colors.primary,
+            }}
+          >
+            <ThemedText variant="label" color="onPrimary">
+              Start swiping
+            </ThemedText>
+          </PressableScale>
+        </View>
+      ) : (
+        <>
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.listingId}
+            renderItem={({ item }) => (
+              <CartItemRow item={item} onRemove={removeItem} />
+            )}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+          />
+
+          {/* Footer */}
+          <View
+            style={{
+              paddingTop: 16,
+              gap: 12,
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <ThemedText variant="label">Total</ThemedText>
+              <ThemedText variant="headline">
+                ${(totalCents / 100).toFixed(2)}
+              </ThemedText>
+            </View>
+
+            <PressableScale
+              accessibilityLabel="Checkout"
+              onPress={handleCheckout}
+              style={{
+                paddingVertical: 16,
+                borderRadius: theme.radius.md,
+                backgroundColor: theme.colors.primary,
+                alignItems: "center",
+              }}
+            >
+              <ThemedText variant="label" color="onPrimary">
+                Checkout · ${(totalCents / 100).toFixed(2)}
+              </ThemedText>
+            </PressableScale>
+          </View>
+        </>
+      )}
     </Screen>
   );
 }

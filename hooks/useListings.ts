@@ -1,37 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useInventoryStore } from "@/stores/inventory-store";
 import type { Listing } from "@/types/listing";
+import type { Product } from "@/types/product";
 
-const MOCK_LISTINGS: Listing[] = [
-  {
-    id: "1",
-    title: "Vintage camera kit",
-    priceLabel: "$240",
-    imageUrl: "https://picsum.photos/id/250/900/1200",
-  },
-  {
-    id: "2",
-    title: "Minimal desk lamp",
-    priceLabel: "$48",
-    imageUrl: "https://picsum.photos/id/180/900/1200",
-  },
-  {
-    id: "3",
-    title: "Ceramic pour-over set",
-    priceLabel: "$62",
-    imageUrl: "https://picsum.photos/id/225/900/1200",
-  },
-  {
-    id: "4",
-    title: "Wireless earbuds",
-    priceLabel: "$129",
-    imageUrl: "https://picsum.photos/id/367/900/1200",
-  },
-];
+function toListListing(p: Product): Listing {
+  return {
+    id: p.id,
+    title: p.title,
+    priceLabel: p.priceLabel,
+    imageUrl: p.imageUrl,
+    unitPriceCents: p.unitPriceCents,
+  };
+}
 
-export function useListings() {
-  return useQuery({
-    queryKey: ["listings"],
-    queryFn: async (): Promise<Listing[]> => MOCK_LISTINGS,
-    staleTime: Infinity,
-  });
+export function useListings(): { data: Listing[]; isLoading: false } {
+  const products = useInventoryStore((s) => s.products);
+  const data = useMemo(
+    () => products.filter((p) => p.stock > 0).map(toListListing),
+    [products],
+  );
+  return { data, isLoading: false };
 }
