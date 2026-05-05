@@ -1,12 +1,7 @@
 import type { ReactNode } from "react";
-import {
-  createContext,
-  useContext,
-  useMemo,
-} from "react";
+import { createContext, useContext, useMemo } from "react";
 import { useColorScheme } from "react-native";
 import type { TextStyle } from "react-native";
-import { useSessionStore } from "@/stores/session-store";
 
 export type TypographyVariant = "title" | "headline" | "body" | "caption" | "label";
 
@@ -64,29 +59,14 @@ function buildTheme(scheme: "light" | "dark"): AppTheme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const preference = useSessionStore((s) => s.themePreference);
   const system = useColorScheme();
-  const resolvedScheme: "light" | "dark" =
-    preference === "system"
-      ? system === "dark"
-        ? "dark"
-        : "light"
-      : preference;
-
-  const theme = useMemo(
-    () => buildTheme(resolvedScheme),
-    [resolvedScheme],
-  );
-
-  return (
-    <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
-  );
+  const scheme: "light" | "dark" = system === "dark" ? "dark" : "light";
+  const theme = useMemo(() => buildTheme(scheme), [scheme]);
+  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): AppTheme {
   const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
+  if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
