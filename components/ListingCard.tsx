@@ -14,13 +14,16 @@ type Props = {
 export function ListingCard({ listing, style }: Props) {
   const theme = useTheme();
   return (
-    <View style={[{ width: "100%" }, style]}>
-      <GlassSurface style={{ flexGrow: 1 }}>
+    <View style={[{ width: "100%", height: 500 }, style]}>
+      <GlassSurface style={{ flex: 1 }}>
         <Image
           source={{ uri: listing.imageUrl }}
+          cachePolicy="memory-disk"
+          recyclingKey={listing.id}
+          transition={0}
           style={{
             width: "100%",
-            height: 360,
+            height: 340,
             borderTopLeftRadius: theme.radius.md - 1,
             borderTopRightRadius: theme.radius.md - 1,
           }}
@@ -32,24 +35,27 @@ export function ListingCard({ listing, style }: Props) {
             padding: 16,
             gap: 6,
             backgroundColor: theme.colors.surface,
+            flex: 1,
           }}
         >
-          <ThemedText variant="caption" color="muted">
+          <ThemedText variant="caption" color="muted" numberOfLines={1}>
             {(listing.parentCategory ?? listing.category ?? "General") +
               (listing.subCategory ? ` • ${listing.subCategory}` : "")}
           </ThemedText>
-          <ThemedText variant="headline">{listing.title}</ThemedText>
+          <ThemedText variant="headline" numberOfLines={2}>
+            {listing.title}
+          </ThemedText>
           <ThemedText variant="label" color="secondary">
             {listing.priceLabel}
             {listing.unit ? ` / ${listing.unit}` : ""}
           </ThemedText>
           {(listing.attributes?.length ?? 0) > 0 && (
-            <ThemedText variant="caption" color="muted">
+            <ThemedText variant="caption" color="muted" numberOfLines={1}>
               Attributes: {listing.attributes?.join(" • ")}
             </ThemedText>
           )}
           {(listing.variants?.length ?? 0) > 0 && (
-            <ThemedText variant="caption" color="muted">
+            <ThemedText variant="caption" color="muted" numberOfLines={1}>
               Variants: {listing.variants?.join(" • ")}
             </ThemedText>
           )}
