@@ -34,10 +34,25 @@ export function ListingCard({ listing, style }: Props) {
             backgroundColor: theme.colors.surface,
           }}
         >
+          <ThemedText variant="caption" color="muted">
+            {(listing.parentCategory ?? listing.category ?? "General") +
+              (listing.subCategory ? ` • ${listing.subCategory}` : "")}
+          </ThemedText>
           <ThemedText variant="headline">{listing.title}</ThemedText>
           <ThemedText variant="label" color="secondary">
             {listing.priceLabel}
+            {listing.unit ? ` / ${listing.unit}` : ""}
           </ThemedText>
+          {(listing.attributes?.length ?? 0) > 0 && (
+            <ThemedText variant="caption" color="muted">
+              Attributes: {listing.attributes?.join(" • ")}
+            </ThemedText>
+          )}
+          {(listing.variants?.length ?? 0) > 0 && (
+            <ThemedText variant="caption" color="muted">
+              Variants: {listing.variants?.join(" • ")}
+            </ThemedText>
+          )}
         </View>
       </GlassSurface>
     </View>

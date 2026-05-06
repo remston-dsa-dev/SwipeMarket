@@ -20,6 +20,11 @@ const schema = z.object({
     .number({ invalid_type_error: "Must be a number" })
     .int("Whole numbers only")
     .min(1, "At least 1"),
+  parentCategory: z.string().min(2, "Parent category is required"),
+  subCategory: z.string().min(2, "Sub category is required"),
+  attributes: z.string().min(2, "Add at least one attribute"),
+  variants: z.string().min(2, "Add at least one variant"),
+  unit: z.string().min(1, "Unit is required"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -41,11 +46,24 @@ export default function AddProductScreen() {
       price: "",
       imageUrl: "",
       stock: undefined,
+      parentCategory: "",
+      subCategory: "",
+      attributes: "",
+      variants: "",
+      unit: "",
     },
   });
 
   function onSubmit(values: FormValues) {
     const unitPriceCents = Math.round(parseFloat(values.price) * 100);
+    const attributes = values.attributes
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const variants = values.variants
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
     addProduct({
       title: values.title,
       description: values.description,
@@ -53,6 +71,12 @@ export default function AddProductScreen() {
       unitPriceCents,
       imageUrl: values.imageUrl,
       stock: values.stock,
+      parentCategory: values.parentCategory.trim(),
+      subCategory: values.subCategory.trim(),
+      category: values.parentCategory.trim(),
+      attributes,
+      variants,
+      unit: values.unit.trim(),
     });
     Alert.alert("Product added!", `"${values.title}" is now live in the swipe deck.`, [
       { text: "OK", onPress: () => router.back() },
@@ -143,6 +167,51 @@ export default function AddProductScreen() {
             name="stock"
             placeholder="e.g. 10"
             keyboardType="number-pad"
+            returnKeyType="done"
+          />
+
+          <FormField
+            label="Parent Category"
+            error={errors.parentCategory?.message}
+            control={control}
+            name="parentCategory"
+            placeholder="e.g. Electronics"
+            returnKeyType="next"
+          />
+
+          <FormField
+            label="Sub Category"
+            error={errors.subCategory?.message}
+            control={control}
+            name="subCategory"
+            placeholder="e.g. Audio"
+            returnKeyType="next"
+          />
+
+          <FormField
+            label="Attributes (comma-separated)"
+            error={errors.attributes?.message}
+            control={control}
+            name="attributes"
+            placeholder="e.g. Wireless, Noise Cancelling"
+            returnKeyType="next"
+          />
+
+          <FormField
+            label="Variants (comma-separated)"
+            error={errors.variants?.message}
+            control={control}
+            name="variants"
+            placeholder="e.g. ANC, 30h Battery"
+            returnKeyType="next"
+          />
+
+          <FormField
+            label="Unit"
+            error={errors.unit?.message}
+            control={control}
+            name="unit"
+            placeholder="e.g. piece, pack, pair"
             returnKeyType="done"
           />
 

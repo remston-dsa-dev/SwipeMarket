@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { Image } from "expo-image";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { useCartStore } from "@/stores/cart-store";
 import { useTheme } from "@/theme/ThemeContext";
 import { useInventoryStore } from "@/stores/inventory-store";
 import type { Product } from "@/types/product";
@@ -20,6 +21,12 @@ export function ProductRow({ product }: Props) {
   const theme = useTheme();
   const adjustStock = useInventoryStore((s) => s.adjustStock);
   const removeProduct = useInventoryStore((s) => s.removeProduct);
+  const cartItems = useCartStore((s) => s.items);
+  const qtyOnHold = cartItems
+    .filter((item) => item.listingId === product.id)
+    .reduce((sum, item) => sum + item.qty, 0);
+  const qtyAllocated = product.qtyAllocated ?? 0;
+  const qtyAvailable = Math.max(0, product.stock - qtyOnHold);
   const color = stockColor(product.stock);
 
   return (
@@ -47,7 +54,7 @@ export function ProductRow({ product }: Props) {
         <ThemedText variant="caption" color="secondary">
           {product.priceLabel}
         </ThemedText>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <View
             style={{
               width: 8,
@@ -57,7 +64,13 @@ export function ProductRow({ product }: Props) {
             }}
           />
           <ThemedText variant="caption" style={{ color }}>
-            {product.stock} in stock
+            Qty Available: {qtyAvailable}
+          </ThemedText>
+          <ThemedText variant="caption" color="muted">
+            Qty On Hold: {qtyOnHold}
+          </ThemedText>
+          <ThemedText variant="caption" color="muted">
+            Qty Allocated: {qtyAllocated}
           </ThemedText>
         </View>
       </View>
@@ -66,12 +79,15 @@ export function ProductRow({ product }: Props) {
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <PressableScale
           accessibilityLabel="Decrease stock"
-          onPress={() => adjustStock(product.id, -1)}
+          onPress={() => {
+            if (qtyAvailable <= 0) return;
+            adjustStock(product.id, -1);
+          }}
           style={[
             stockBtnStyle,
             {
               borderColor:
-                product.stock === 0 ? theme.colors.border : theme.colors.primary,
+                qtyAvailable === 0 ? theme.colors.border : theme.colors.primary,
             },
           ]}
         >
@@ -79,7 +95,7 @@ export function ProductRow({ product }: Props) {
             variant="caption"
             style={{
               color:
-                product.stock === 0
+                qtyAvailable === 0
                   ? theme.colors.textSecondary
                   : theme.colors.primary,
               fontWeight: "700",
@@ -93,7 +109,7 @@ export function ProductRow({ product }: Props) {
           variant="caption"
           style={{ minWidth: 22, textAlign: "center", fontWeight: "700" }}
         >
-          {product.stock}
+          {qtyAvailable}
         </ThemedText>
 
         <PressableScale

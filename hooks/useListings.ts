@@ -10,6 +10,12 @@ function toListListing(p: Product): Listing {
     priceLabel: p.priceLabel,
     imageUrl: p.imageUrl,
     unitPriceCents: p.unitPriceCents,
+    parentCategory: p.parentCategory,
+    subCategory: p.subCategory,
+    category: p.category,
+    attributes: p.attributes,
+    variants: p.variants,
+    unit: p.unit,
   };
 }
 
