@@ -61,6 +61,14 @@ export default function SignUpScreen() {
     router.replace(role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
   }
 
+  function handleBackPress() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/");
+  }
+
   const isLight = theme.scheme === "light";
   const compact = height < 820;
 
@@ -76,7 +84,7 @@ export default function SignUpScreen() {
         <View style={styles.backRow}>
           <PressableScale
             accessibilityLabel="Back"
-            onPress={() => router.back()}
+            onPress={handleBackPress}
             style={styles.backBtn}
           >
             <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />

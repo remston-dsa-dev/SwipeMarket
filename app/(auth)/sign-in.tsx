@@ -51,6 +51,14 @@ export default function SignInScreen() {
     router.replace("/(customer)/swipe");
   }
 
+  function handleBackPress() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/");
+  }
+
   const isLight = theme.scheme === "light";
   const compact = height < 780;
 
@@ -66,7 +74,7 @@ export default function SignInScreen() {
         <View style={styles.backRow}>
           <PressableScale
             accessibilityLabel="Back"
-            onPress={() => router.back()}
+            onPress={handleBackPress}
             style={styles.backBtn}
           >
             <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />
