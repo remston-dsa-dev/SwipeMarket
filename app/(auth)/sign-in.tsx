@@ -3,9 +3,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -22,6 +22,7 @@ export default function SignInScreen() {
   const router = useRouter();
   const theme  = useTheme();
   const setSession = useSessionStore((s) => s.setSession);
+  const { height } = useWindowDimensions();
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +52,7 @@ export default function SignInScreen() {
   }
 
   const isLight = theme.scheme === "light";
+  const compact = height < 780;
 
   return (
     <SafeAreaView
@@ -71,21 +73,17 @@ export default function SignInScreen() {
           </PressableScale>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.logoWrap}>
-            <Logo size="md" showWordmark lightBackground={isLight} />
+        <View style={[styles.content, compact && styles.contentCompact]}>
+          <View style={[styles.logoWrap, compact && styles.logoWrapCompact]}>
+            <Logo size={compact ? "sm" : "md"} showWordmark lightBackground={isLight} />
           </View>
 
-          <View style={styles.headingWrap}>
+          <View style={[styles.headingWrap, compact && styles.headingWrapCompact]}>
             <ThemedText variant="title">Welcome back</ThemedText>
             <ThemedText variant="body" color="muted">Sign in to continue shopping</ThemedText>
           </View>
 
-          <View style={styles.fields}>
+          <View style={[styles.fields, compact && styles.fieldsCompact]}>
             <AuthInput
               icon="mail-outline"
               placeholder="Email address"
@@ -119,45 +117,18 @@ export default function SignInScreen() {
           <PressableScale
             accessibilityLabel="Continue"
             onPress={handleSignIn}
-            style={[styles.ctaBtn, { backgroundColor: loading ? theme.colors.border : theme.colors.primary }]}
+            style={[
+              styles.ctaBtn,
+              compact && styles.ctaBtnCompact,
+              { backgroundColor: loading ? theme.colors.border : theme.colors.primary },
+            ]}
           >
             <ThemedText variant="label" color="onPrimary">
               {loading ? "Signing in…" : "Continue"}
             </ThemedText>
           </PressableScale>
 
-          {/* Divider */}
-          <View style={styles.divider}>
-            <View style={[styles.line, { backgroundColor: theme.colors.border }]} />
-            <ThemedText variant="caption" color="muted">or</ThemedText>
-            <View style={[styles.line, { backgroundColor: theme.colors.border }]} />
-          </View>
-
-          {/* Social */}
-          <View style={styles.social}>
-            <PressableScale
-              accessibilityLabel="Continue with Google"
-              onPress={() => Alert.alert("Coming soon", "Google sign-in is not yet available.")}
-              style={[styles.socialBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            >
-              <Text style={{ fontSize: 17, fontWeight: "700", color: "#4285F4" }}>G</Text>
-              <ThemedText variant="label">Continue with Google</ThemedText>
-            </PressableScale>
-
-            {Platform.OS === "ios" && (
-              <PressableScale
-                accessibilityLabel="Continue with Apple"
-                onPress={() => Alert.alert("Coming soon", "Apple sign-in is not yet available.")}
-                style={[styles.socialBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-              >
-                <Ionicons name="logo-apple" size={18} color={theme.colors.textPrimary} />
-                <ThemedText variant="label">Continue with Apple</ThemedText>
-              </PressableScale>
-            )}
-          </View>
-
-          {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, compact && styles.footerCompact]}>
             <PressableScale
               accessibilityLabel="Create account"
               onPress={() => router.replace("/(auth)/sign-up")}
@@ -175,12 +146,12 @@ export default function SignInScreen() {
                 router.replace("/(supplier)/dashboard");
               }}
             >
-              <ThemedText variant="caption" color="muted" style={{ opacity: 0.5, marginTop: 6 }}>
+              <ThemedText variant="caption" color="muted" style={{ opacity: 0.5, marginTop: compact ? 4 : 6 }}>
                 Supplier portal →
               </ThemedText>
             </PressableScale>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -189,14 +160,16 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   backRow:     { paddingHorizontal: 20, paddingTop: 8 },
   backBtn:     { alignSelf: "flex-start", padding: 4 },
-  scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
+  content:     { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
+  contentCompact: { paddingBottom: 16 },
   logoWrap:    { alignItems: "center", marginTop: 20, marginBottom: 36 },
+  logoWrapCompact: { marginTop: 8, marginBottom: 20 },
   headingWrap: { gap: 6, marginBottom: 28 },
+  headingWrapCompact: { marginBottom: 18 },
   fields:      { gap: 14, marginBottom: 28 },
+  fieldsCompact: { gap: 10, marginBottom: 18 },
   ctaBtn:      { borderRadius: 999, paddingVertical: 18, alignItems: "center", marginBottom: 28 },
-  divider:     { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 24 },
-  line:        { flex: 1, height: 1 },
-  social:      { gap: 12, marginBottom: 36 },
-  socialBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 999, paddingVertical: 16, borderWidth: 1.5 },
+  ctaBtnCompact: { paddingVertical: 14, marginBottom: 18 },
   footer:      { alignItems: "center", gap: 4 },
+  footerCompact: { gap: 0 },
 });
