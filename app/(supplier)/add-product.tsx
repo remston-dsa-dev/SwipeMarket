@@ -1,12 +1,15 @@
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from "react-native";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
-import { useInventoryStore } from "@/stores/inventory-store";
+import { productToInsertRow } from "@/lib/product-insert";
+import { supabase } from "@/lib/supabase";
+import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
 const schema = z.object({
@@ -32,7 +35,8 @@ type FormValues = z.infer<typeof schema>;
 export default function AddProductScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const addProduct = useInventoryStore((s) => s.addProduct);
+  const queryClient = useQueryClient();
+  const supplierId = useSessionStore((s) => s.userId);
 
   const {
     control,
@@ -54,7 +58,11 @@ export default function AddProductScreen() {
     },
   });
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
+    if (!supplierId) {
+      Alert.alert("Session error", "Sign in again.");
+      return;
+    }
     const unitPriceCents = Math.round(parseFloat(values.price) * 100);
     const attributes = values.attributes
       .split(",")
@@ -64,7 +72,7 @@ export default function AddProductScreen() {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
-    addProduct({
+    const payload = productToInsertRow(supplierId, {
       title: values.title,
       description: values.description,
       priceLabel: `$${parseFloat(values.price).toFixed(2)}`,
@@ -78,6 +86,13 @@ export default function AddProductScreen() {
       variants,
       unit: values.unit.trim(),
     });
+    const { error } = await supabase.from("products").insert(payload);
+    if (error) {
+      Alert.alert("Could not save", error.message);
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: ["supplier-products", supplierId] });
+    void queryClient.invalidateQueries({ queryKey: ["listings"] });
     Alert.alert("Product added!", `"${values.title}" is now live in the swipe deck.`, [
       { text: "OK", onPress: () => router.back() },
     ]);

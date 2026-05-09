@@ -1,5 +1,6 @@
-import { Alert, FlatList, Modal, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -8,8 +9,11 @@ import { PressableScale } from "@/components/PressableScale";
 import { ProductRow } from "@/components/ProductRow";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
+import { productToInsertRow } from "@/lib/product-insert";
 import { buildSupplierTemplateCsv, parseSupplierCsvWithReport } from "@/lib/supplier-bulk";
-import { useInventoryStore } from "@/stores/inventory-store";
+import { supabase } from "@/lib/supabase";
+import { signOutApp } from "@/lib/sign-out";
+import { useSupplierProducts } from "@/hooks/useSupplierProducts";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 import type { Product } from "@/types/product";
@@ -18,9 +22,9 @@ import { useState } from "react";
 export default function SupplierDashboardScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const clearSession = useSessionStore((s) => s.clearSession);
-  const products = useInventoryStore((s) => s.products);
-  const addProductsBulk = useInventoryStore((s) => s.addProductsBulk);
+  const queryClient = useQueryClient();
+  const supplierId = useSessionStore((s) => s.userId);
+  const { data: products = [], isPending: productsLoading } = useSupplierProducts(supplierId);
   const [pendingImport, setPendingImport] = useState<Omit<Product, "id">[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
@@ -90,7 +94,7 @@ export default function SupplierDashboardScreen() {
     }
   }
 
-  function confirmPublishImport() {
+  async function confirmPublishImport() {
     const invalidRow = pendingImport.findIndex(
       (product) =>
         !product.title.trim() ||
@@ -106,10 +110,22 @@ export default function SupplierDashboardScreen() {
       );
       return;
     }
-    addProductsBulk(pendingImport);
+    if (!supplierId) {
+      Alert.alert("Session error", "Sign in again.");
+      return;
+    }
+    const count = pendingImport.length;
+    const rows = pendingImport.map((p) => productToInsertRow(supplierId, p));
+    const { error } = await supabase.from("products").insert(rows);
+    if (error) {
+      Alert.alert("Publish failed", error.message);
+      return;
+    }
     setPendingImport([]);
     setEditingIndex(null);
-    Alert.alert("Published", `${pendingImport.length} products are now live.`);
+    void queryClient.invalidateQueries({ queryKey: ["supplier-products", supplierId] });
+    void queryClient.invalidateQueries({ queryKey: ["listings"] });
+    Alert.alert("Published", `${count} products are now live.`);
   }
 
   function updatePendingProduct(index: number, updates: Partial<Omit<Product, "id">>) {
@@ -158,8 +174,7 @@ export default function SupplierDashboardScreen() {
         <PressableScale
           accessibilityLabel="Sign out"
           onPress={() => {
-            clearSession();
-            router.replace("/sign-in");
+            void signOutApp().then(() => router.replace("/(auth)/sign-in"));
           }}
           style={{
             paddingHorizontal: 12,
@@ -228,7 +243,11 @@ export default function SupplierDashboardScreen() {
         </View>
       </View>
 
-      {products.length === 0 ? (
+      {productsLoading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : products.length === 0 ? (
         <View style={{ flex: 1, justifyContent: "center", gap: 12 }}>
           <ThemedText variant="headline">No products yet</ThemedText>
           <ThemedText variant="body" color="muted">

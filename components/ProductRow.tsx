@@ -1,11 +1,14 @@
-import { View } from "react-native";
+import { useState } from "react";
+import { Alert, View } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useCartStore } from "@/stores/cart-store";
+import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
-import { useInventoryStore } from "@/stores/inventory-store";
 import type { Product } from "@/types/product";
+import { supabase } from "@/lib/supabase";
 
 type Props = {
   product: Product;
@@ -19,8 +22,8 @@ function stockColor(stock: number): string {
 
 export function ProductRow({ product }: Props) {
   const theme = useTheme();
-  const adjustStock = useInventoryStore((s) => s.adjustStock);
-  const removeProduct = useInventoryStore((s) => s.removeProduct);
+  const queryClient = useQueryClient();
+  const supplierId = useSessionStore((s) => s.userId);
   const cartItems = useCartStore((s) => s.items);
   const qtyOnHold = cartItems
     .filter((item) => item.listingId === product.id)
@@ -28,6 +31,66 @@ export function ProductRow({ product }: Props) {
   const qtyAllocated = product.qtyAllocated ?? 0;
   const qtyAvailable = Math.max(0, product.stock - qtyOnHold);
   const color = stockColor(product.stock);
+  const [busy, setBusy] = useState(false);
+
+  const invalidate = () => {
+    if (supplierId) {
+      void queryClient.invalidateQueries({ queryKey: ["supplier-products", supplierId] });
+    }
+    void queryClient.invalidateQueries({ queryKey: ["listings"] });
+  };
+
+  const adjustMutation = useMutation({
+    mutationFn: async (delta: number) => {
+      const next = Math.max(0, product.stock + delta);
+      const { error } = await supabase
+        .from("products")
+        .update({
+          stock: next,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", product.id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => Alert.alert("Update failed", e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("products").delete().eq("id", product.id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => Alert.alert("Delete failed", e.message),
+  });
+
+  function adjustStock(delta: number) {
+    if (busy) return;
+    if (delta < 0 && qtyAvailable <= 0) return;
+    setBusy(true);
+    adjustMutation.mutate(delta, {
+      onSettled: () => setBusy(false),
+    });
+  }
+
+  function removeProduct() {
+    Alert.alert(
+      "Remove product?",
+      `Remove "${product.title}" from your inventory?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            setBusy(true);
+            deleteMutation.mutate(undefined, { onSettled: () => setBusy(false) });
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <View
@@ -75,14 +138,10 @@ export function ProductRow({ product }: Props) {
         </View>
       </View>
 
-      {/* Stock adjust */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <PressableScale
           accessibilityLabel="Decrease stock"
-          onPress={() => {
-            if (qtyAvailable <= 0) return;
-            adjustStock(product.id, -1);
-          }}
+          onPress={() => adjustStock(-1)}
           style={[
             stockBtnStyle,
             {
@@ -114,7 +173,7 @@ export function ProductRow({ product }: Props) {
 
         <PressableScale
           accessibilityLabel="Increase stock"
-          onPress={() => adjustStock(product.id, 1)}
+          onPress={() => adjustStock(1)}
           style={[stockBtnStyle, { borderColor: theme.colors.primary }]}
         >
           <ThemedText
@@ -126,10 +185,9 @@ export function ProductRow({ product }: Props) {
         </PressableScale>
       </View>
 
-      {/* Delete */}
       <PressableScale
         accessibilityLabel={`Delete ${product.title}`}
-        onPress={() => removeProduct(product.id)}
+        onPress={removeProduct}
         style={{
           paddingHorizontal: 10,
           paddingVertical: 6,

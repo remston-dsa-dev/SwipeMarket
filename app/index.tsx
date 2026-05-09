@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, useRouter } from "expo-router";
 import Animated, {
@@ -20,8 +20,17 @@ import { useSessionStore } from "@/stores/session-store";
 const { height: H } = Dimensions.get("window");
 
 export default function Index() {
-  const userId = useSessionStore((s) => s.userId);
-  const role   = useSessionStore((s) => s.role);
+  const userId          = useSessionStore((s) => s.userId);
+  const role            = useSessionStore((s) => s.role);
+  const authInitialized = useSessionStore((s) => s.authInitialized);
+
+  if (!authInitialized) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0C0520" }}>
+        <ActivityIndicator size="large" color="#A855F7" />
+      </View>
+    );
+  }
 
   if (userId) {
     return (

@@ -1,29 +1,35 @@
-import { useMemo } from "react";
-import { useInventoryStore } from "@/stores/inventory-store";
+import { useQuery } from "@tanstack/react-query";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { productToListing, rowToProduct } from "@/lib/product-map";
+import { supabase } from "@/lib/supabase";
 import type { Listing } from "@/types/listing";
-import type { Product } from "@/types/product";
 
-function toListListing(p: Product): Listing {
-  return {
-    id: p.id,
-    title: p.title,
-    priceLabel: p.priceLabel,
-    imageUrl: p.imageUrl,
-    unitPriceCents: p.unitPriceCents,
-    parentCategory: p.parentCategory,
-    subCategory: p.subCategory,
-    category: p.category,
-    attributes: p.attributes,
-    variants: p.variants,
-    unit: p.unit,
-  };
+async function fetchListings(): Promise<Listing[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("published", true)
+    .gt("stock", 0)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => productToListing(rowToProduct(row)));
 }
 
-export function useListings(): { data: Listing[]; isLoading: false } {
-  const products = useInventoryStore((s) => s.products);
-  const data = useMemo(
-    () => products.filter((p) => p.stock > 0).map(toListListing),
-    [products],
-  );
-  return { data, isLoading: false };
+export function useListings() {
+  const enabled = isSupabaseConfigured();
+
+  const query = useQuery({
+    queryKey: ["listings"],
+    queryFn: fetchListings,
+    enabled,
+    staleTime: 30_000,
+  });
+
+  return {
+    data: query.data ?? [],
+    isLoading: enabled ? query.isPending : false,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }

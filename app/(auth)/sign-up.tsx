@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -14,6 +15,9 @@ import { AuthInput } from "@/components/AuthInput";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { signInWithGoogle } from "@/lib/google-auth";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { supabase } from "@/lib/supabase";
 import { useSessionStore, type UserRole } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -40,7 +44,8 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState("");
   const [role,     setRole]     = useState<UserRole>("customer");
   const [errors,   setErrors]   = useState<{ name?: string; email?: string; password?: string }>({});
-  const [loading,  setLoading]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   function validate() {
     const e: typeof errors = {};
@@ -55,10 +60,70 @@ export default function SignUpScreen() {
 
   async function handleCreate() {
     if (!validate()) return;
+
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        "Supabase not configured",
+        "Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your .env file (see .env.example).",
+      );
+      return;
+    }
+
     setLoading(true);
-    await new Promise<void>((r) => setTimeout(r, 800));
-    setSession(email.trim().toLowerCase(), role);
-    router.replace(role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            full_name: name.trim(),
+            role,
+          },
+        },
+      });
+
+      if (error) {
+        Alert.alert("Sign up failed", error.message);
+        return;
+      }
+
+      if (!data.session) {
+        Alert.alert(
+          "Check your email",
+          "We sent a confirmation link. After confirming, sign in on this device.",
+        );
+        router.replace("/(auth)/sign-in");
+        return;
+      }
+
+      const user = data.session.user;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const resolved = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
+      setSession(user.id, resolved);
+      router.replace(resolved === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSignUp() {
+    setGoogleLoading(true);
+    try {
+      const result = await signInWithGoogle({ pendingSignupRole: role });
+      if (!result.ok) return;
+      router.replace(
+        result.role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
+      );
+    } catch {
+      /* Alert shown in signInWithGoogle */
+    } finally {
+      setGoogleLoading(false);
+    }
   }
 
   function handleBackPress() {
@@ -136,7 +201,6 @@ export default function SignUpScreen() {
             />
           </View>
 
-          {/* Role selection */}
           <View style={[styles.roleSection, compact && styles.roleSectionCompact]}>
             <ThemedText variant="label">How will you use SwipeMarket?</ThemedText>
             <View style={[styles.roleRow, compact && styles.roleRowCompact]}>
@@ -202,6 +266,30 @@ export default function SignUpScreen() {
             </ThemedText>
           </PressableScale>
 
+          <View style={[styles.oauthDivider, compact && styles.oauthDividerCompact]}>
+            <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
+            <ThemedText variant="caption" color="muted">or</ThemedText>
+            <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
+          </View>
+
+          <PressableScale
+            accessibilityLabel="Sign up with Google"
+            onPress={handleGoogleSignUp}
+            style={[
+              styles.googleBtn,
+              compact && styles.googleBtnCompact,
+              {
+                borderColor: theme.colors.border,
+                opacity: googleLoading || loading ? 0.65 : 1,
+              },
+            ]}
+          >
+            <Ionicons name="logo-google" size={22} color={theme.colors.textPrimary} />
+            <ThemedText variant="label">
+              {googleLoading ? "Connecting…" : "Sign up with Google"}
+            </ThemedText>
+          </PressableScale>
+
           <View style={[styles.footer, compact && styles.footerCompact]}>
             <PressableScale
               accessibilityLabel="Sign in"
@@ -241,6 +329,25 @@ const styles = StyleSheet.create({
   checkmark:   { position: "absolute", top: 10, right: 10 },
   ctaBtn:      { borderRadius: 999, paddingVertical: 18, alignItems: "center", marginBottom: 20 },
   ctaBtnCompact: { paddingVertical: 14, marginBottom: 14 },
+  oauthDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20,
+  },
+  oauthDividerCompact: { marginBottom: 14 },
+  oauthLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  googleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 999,
+    paddingVertical: 16,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  googleBtnCompact: { paddingVertical: 14, marginBottom: 14 },
   footer: { alignItems: "center" },
   footerCompact: { marginBottom: 0 },
 });

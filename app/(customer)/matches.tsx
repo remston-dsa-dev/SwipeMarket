@@ -5,7 +5,6 @@ import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { useCartStore } from "@/stores/cart-store";
-import { useInventoryStore } from "@/stores/inventory-store";
 import { useTheme } from "@/theme/ThemeContext";
 
 export default function CartScreen() {
@@ -15,20 +14,17 @@ export default function CartScreen() {
   const totalCents = useCartStore((s) => s.totalCents);
   const removeItem = useCartStore((s) => s.removeItem);
   const clearCart = useCartStore((s) => s.clearCart);
-  const allocateFromCart = useInventoryStore((s) => s.allocateFromCart);
-
   const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
 
   function handleCheckout() {
     Alert.alert(
-      "Order placed!",
-      "Thanks for your purchase. Stripe payment integration coming soon.",
+      "Demo checkout",
+      "Your cart is stored on this device only. Connecting checkout to Stripe and deducting stock in Supabase will ship with the orders API.",
       [
         {
           text: "Clear cart",
           style: "destructive",
           onPress: () => {
-            allocateFromCart(items);
             clearCart();
             router.back();
           },

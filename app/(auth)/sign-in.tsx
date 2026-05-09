@@ -15,7 +15,10 @@ import { AuthInput } from "@/components/AuthInput";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { useSessionStore } from "@/stores/session-store";
+import { signInWithGoogle } from "@/lib/google-auth";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { supabase } from "@/lib/supabase";
+import { useSessionStore, type UserRole } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
 export default function SignInScreen() {
@@ -27,7 +30,8 @@ export default function SignInScreen() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [errors,   setErrors]   = useState<{ email?: string; password?: string }>({});
-  const [loading,  setLoading]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   function validate() {
     const e: typeof errors = {};
@@ -45,10 +49,63 @@ export default function SignInScreen() {
 
   async function handleSignIn() {
     if (!validate()) return;
+
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        "Supabase not configured",
+        "Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your .env file (see .env.example).",
+      );
+      return;
+    }
+
     setLoading(true);
-    await new Promise<void>((r) => setTimeout(r, 700));
-    setSession(email.trim().toLowerCase(), "customer");
-    router.replace("/(customer)/swipe");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (error) {
+        Alert.alert("Sign in failed", error.message);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert(
+          "Confirm your email",
+          "Check your inbox and confirm your address before signing in.",
+        );
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      const role = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
+      setSession(session.user.id, role);
+      router.replace(role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.ok) return;
+      router.replace(
+        result.role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
+      );
+    } catch {
+      /* Alert shown in signInWithGoogle */
+    } finally {
+      setGoogleLoading(false);
+    }
   }
 
   function handleBackPress() {
@@ -115,7 +172,11 @@ export default function SignInScreen() {
             />
             <PressableScale
               accessibilityLabel="Forgot password"
-              onPress={() => Alert.alert("Reset password", "Password reset emails coming soon.")}
+              onPress={() =>
+                Alert.alert(
+                  "Reset password",
+                  "Use the Supabase dashboard or add a password reset flow with resetPasswordForEmail.",
+                )}
               style={{ alignSelf: "flex-end" }}
             >
               <ThemedText variant="caption" color="secondary">Forgot password?</ThemedText>
@@ -136,6 +197,30 @@ export default function SignInScreen() {
             </ThemedText>
           </PressableScale>
 
+          <View style={[styles.oauthDivider, compact && styles.oauthDividerCompact]}>
+            <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
+            <ThemedText variant="caption" color="muted">or</ThemedText>
+            <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
+          </View>
+
+          <PressableScale
+            accessibilityLabel="Sign in with Google"
+            onPress={handleGoogleSignIn}
+            style={[
+              styles.googleBtn,
+              compact && styles.googleBtnCompact,
+              {
+                borderColor: theme.colors.border,
+                opacity: googleLoading || loading ? 0.65 : 1,
+              },
+            ]}
+          >
+            <Ionicons name="logo-google" size={22} color={theme.colors.textPrimary} />
+            <ThemedText variant="label">
+              {googleLoading ? "Connecting…" : "Sign in with Google"}
+            </ThemedText>
+          </PressableScale>
+
           <View style={[styles.footer, compact && styles.footerCompact]}>
             <PressableScale
               accessibilityLabel="Create account"
@@ -145,18 +230,6 @@ export default function SignInScreen() {
                 New to SwipeMarket?{" "}
                 <Text style={{ color: theme.colors.secondary, fontWeight: "600" }}>Create account</Text>
               </Text>
-            </PressableScale>
-
-            <PressableScale
-              accessibilityLabel="Supplier portal"
-              onPress={() => {
-                setSession("supplier@demo.com", "supplier");
-                router.replace("/(supplier)/dashboard");
-              }}
-            >
-              <ThemedText variant="caption" color="muted" style={{ opacity: 0.5, marginTop: compact ? 4 : 6 }}>
-                Supplier portal →
-              </ThemedText>
             </PressableScale>
           </View>
         </View>
@@ -176,8 +249,27 @@ const styles = StyleSheet.create({
   headingWrapCompact: { marginBottom: 18 },
   fields:      { gap: 14, marginBottom: 28 },
   fieldsCompact: { gap: 10, marginBottom: 18 },
-  ctaBtn:      { borderRadius: 999, paddingVertical: 18, alignItems: "center", marginBottom: 28 },
-  ctaBtnCompact: { paddingVertical: 14, marginBottom: 18 },
+  ctaBtn:      { borderRadius: 999, paddingVertical: 18, alignItems: "center", marginBottom: 20 },
+  ctaBtnCompact: { paddingVertical: 14, marginBottom: 14 },
+  oauthDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20,
+  },
+  oauthDividerCompact: { marginBottom: 14 },
+  oauthLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  googleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 999,
+    paddingVertical: 16,
+    borderWidth: 1,
+    marginBottom: 28,
+  },
+  googleBtnCompact: { paddingVertical: 14, marginBottom: 18 },
   footer:      { alignItems: "center", gap: 4 },
   footerCompact: { gap: 0 },
 });

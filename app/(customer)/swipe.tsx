@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, Modal, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Dimensions, Modal, ScrollView, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -18,8 +18,8 @@ import { Screen } from "@/components/Screen";
 import { SwipeCard } from "@/components/SwipeCard";
 import { ThemedText } from "@/components/ThemedText";
 import { useListings } from "@/hooks/useListings";
+import { signOutApp } from "@/lib/sign-out";
 import { useCartStore } from "@/stores/cart-store";
-import { useInventoryStore } from "@/stores/inventory-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 import type { Listing } from "@/types/listing";
@@ -36,9 +36,7 @@ const PRICE_BUCKETS = [
 export default function SwipeScreen() {
   const router       = useRouter();
   const theme        = useTheme();
-  const clearSession = useSessionStore((s) => s.clearSession);
-  const { data: listings } = useListings();
-  const products   = useInventoryStore((s) => s.products);
+  const { data: listings, isLoading: listingsLoading } = useListings();
   const addItem    = useCartStore((s) => s.addItem);
   const cartItems  = useCartStore((s) => s.items);
 
@@ -58,12 +56,12 @@ export default function SwipeScreen() {
     () =>
       Array.from(
         new Set(
-          products
-            .map((p) => p.parentCategory ?? p.category)
+          listings
+            .map((l) => l.parentCategory ?? l.category)
             .filter((v): v is string => !!v),
         ),
       ).sort(),
-    [products],
+    [listings],
   );
   const subCategories = useMemo(
     () => Array.from(new Set(listings.map((l) => l.subCategory).filter((v): v is string => !!v))).sort(),
@@ -273,6 +271,16 @@ export default function SwipeScreen() {
     setHasVariantsOnly(false);
   }
 
+  if (listingsLoading) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       {/* Header */}
@@ -368,7 +376,9 @@ export default function SwipeScreen() {
             )}
             <PressableScale
               accessibilityLabel="Sign out"
-              onPress={() => { clearSession(); router.replace("/sign-in"); }}
+              onPress={() => {
+                void signOutApp().then(() => router.replace("/(auth)/sign-in"));
+              }}
               style={[styles.emptyBtn, { borderWidth: 1, borderColor: theme.colors.border }]}
             >
               <ThemedText variant="label">Sign out</ThemedText>

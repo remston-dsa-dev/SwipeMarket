@@ -32,8 +32,8 @@ EXPO_PUBLIC_SOCKET_URL=
 
 ```
 app/
-  _layout.tsx          — root layout: providers (Gesture, SafeArea, QueryClient, Theme, Stripe)
-  index.tsx            — redirects to /sign-in, /swipe, or /dashboard based on session
+  _layout.tsx          — root layout: providers (Gesture, SafeArea, QueryClient, AuthProvider, Theme, Stripe)
+  index.tsx            — splash until auth hydrates; then landing or redirect by session + role
   (auth)/              — unauthenticated screens (no tab bar)
     sign-in.tsx
     sign-up.tsx
@@ -46,15 +46,15 @@ app/
 
 ### Auth & Session
 
-Auth is currently demo-only — `sign-in.tsx` calls `setSession("demo-customer"|"demo-supplier", role)` directly, with no Supabase auth call yet. `stores/session-store.ts` persists `{ userId, role, themePreference }` to AsyncStorage via Zustand + `persist` middleware. The root `index.tsx` reads from this store to decide where to redirect.
+Email/password auth uses Supabase (`sign-in.tsx`, `sign-up.tsx`). `providers/AuthProvider.tsx` syncs `supabase.auth` with `stores/session-store.ts` (persisted `userId` + `role`, plus `authInitialized` after the first session check). Profiles and roles come from the `profiles` table (created when a user signs up via an `auth.users` trigger — see `supabase/migrations/`). Configure `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in `.env`; `lib/is-supabase-configured.ts` gates API calls. Route groups `(auth)`, `(customer)`, and `(supplier)` redirect by session and role.
 
 ### Theme System
 
-`theme/ThemeContext.tsx` exports `ThemeProvider`, `useTheme()`, and the `AppTheme` type. The theme is derived from `themePreference` in the session store (light/dark/system) combined with `useColorScheme()`. All colors, radii, blur intensity, and typography variants live on the `AppTheme` object — never hardcode visual values in screens.
+`theme/ThemeContext.tsx` exports `ThemeProvider`, `useTheme()`, and the `AppTheme` type. The theme follows system light/dark via `useColorScheme()`. All colors, radii, blur intensity, and typography variants live on the `AppTheme` object — never hardcode visual values in screens.
 
 ### Data Fetching
 
-React Query (`@tanstack/react-query`) is used for all server state. `hooks/useListings.ts` and `hooks/useMatches.ts` currently return mock data; they will be wired to Supabase queries. The shared `QueryClient` is in `lib/query-client.ts`.
+React Query (`@tanstack/react-query`) is used for server state. `hooks/useListings.ts` reads published in-stock products from Supabase; `hooks/useSupplierProducts.ts` loads a supplier’s inventory. The cart (`stores/cart-store.ts`) stays on-device until checkout is wired to orders/Stripe. The shared `QueryClient` is in `lib/query-client.ts`.
 
 ### Real-time
 

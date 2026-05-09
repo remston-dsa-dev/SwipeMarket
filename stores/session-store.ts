@@ -7,8 +7,11 @@ export type UserRole = "customer" | "supplier";
 export type SessionState = {
   userId: string | null;
   role: UserRole | null;
+  /** False until first Supabase getSession / listener sync finishes (or skips if Supabase unset). */
+  authInitialized: boolean;
   setSession: (userId: string, role: UserRole) => void;
   clearSession: () => void;
+  setAuthInitialized: (value: boolean) => void;
 };
 
 export const useSessionStore = create<SessionState>()(
@@ -16,8 +19,10 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       userId: null,
       role: null,
+      authInitialized: false,
       setSession: (userId, role) => set({ userId, role }),
       clearSession: () => set({ userId: null, role: null }),
+      setAuthInitialized: (authInitialized) => set({ authInitialized }),
     }),
     {
       name: "swipemarket-session",

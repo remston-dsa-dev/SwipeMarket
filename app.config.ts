@@ -28,6 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
   },
   plugins: [
+    "expo-web-browser",
     "expo-router",
     [
       "@stripe/stripe-react-native",
