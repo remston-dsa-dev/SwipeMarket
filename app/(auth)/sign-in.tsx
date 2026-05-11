@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthInput } from "@/components/AuthInput";
+import { GoogleLogoMark } from "@/components/GoogleLogoMark";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
@@ -145,7 +146,7 @@ export default function SignInScreen() {
 
           <View style={[styles.headingWrap, compact && styles.headingWrapCompact]}>
             <ThemedText variant="title">Welcome back</ThemedText>
-            <ThemedText variant="body" color="muted">Sign in to continue shopping</ThemedText>
+            <ThemedText variant="body" color="muted">Sign in to continue</ThemedText>
           </View>
 
           <View style={[styles.fields, compact && styles.fieldsCompact]}>
@@ -210,13 +211,14 @@ export default function SignInScreen() {
               styles.googleBtn,
               compact && styles.googleBtnCompact,
               {
-                borderColor: theme.colors.border,
+                backgroundColor: isLight ? "#FFFFFF" : theme.colors.surface,
+                borderColor: isLight ? "rgba(60, 64, 67, 0.28)" : theme.colors.border,
                 opacity: googleLoading || loading ? 0.65 : 1,
               },
             ]}
           >
-            <Ionicons name="logo-google" size={22} color={theme.colors.textPrimary} />
-            <ThemedText variant="label">
+            <GoogleLogoMark size={22} />
+            <ThemedText variant="label" style={{ color: isLight ? "#1F1F1F" : theme.colors.textPrimary }}>
               {googleLoading ? "Connecting…" : "Sign in with Google"}
             </ThemedText>
           </PressableScale>
