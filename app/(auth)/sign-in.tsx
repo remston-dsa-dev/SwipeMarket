@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,12 +17,14 @@ import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { HREF_ONBOARDING } from "@/lib/routes";
+import { getEmailConfirmationRedirectTo } from "@/lib/auth-redirect";
+import { getLastSignInEmail, setLastSignInEmail } from "@/lib/auth-form-storage";
 import { formatSignInError } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
-import { isProfileOnboardingComplete } from "@/lib/profile-onboarding";
+import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
-import { useSessionStore, type UserRole } from "@/stores/session-store";
+import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
 export default function SignInScreen() {
@@ -36,6 +38,14 @@ export default function SignInScreen() {
   const [errors,   setErrors]   = useState<{ email?: string; password?: string }>({});
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const saved = await getLastSignInEmail();
+      if (saved) setEmail(saved);
+    })();
+  }, []);
 
   function validate() {
     const e: typeof errors = {};
@@ -83,14 +93,10 @@ export default function SignInScreen() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, onboarding_complete")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      const role = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
-      const onboardingComplete = isProfileOnboardingComplete(profile?.onboarding_complete);
+      const { role, onboardingComplete } = await fetchProfileRoleAndOnboarding(session.user.id);
+      const emailToSave =
+        session.user.email?.trim().toLowerCase() || email.trim().toLowerCase();
+      await setLastSignInEmail(emailToSave);
       setSession(session.user.id, role, onboardingComplete);
       if (!onboardingComplete) {
         router.replace(HREF_ONBOARDING);
@@ -102,11 +108,41 @@ export default function SignInScreen() {
     }
   }
 
+  async function handleResendConfirmation() {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
+      Alert.alert("Email required", "Enter the email you used to sign up, then tap resend.");
+      return;
+    }
+    if (!isSupabaseConfigured()) return;
+    setResendLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: trimmed,
+        options: { emailRedirectTo: getEmailConfirmationRedirectTo() },
+      });
+      if (error) {
+        Alert.alert("Could not resend", error.message);
+        return;
+      }
+      Alert.alert("Email sent", "Check your inbox for a new confirmation link.");
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     try {
       const result = await signInWithGoogle();
       if (!result.ok) return;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        await setLastSignInEmail(session.user.email.trim().toLowerCase());
+      }
       const onboardingComplete = useSessionStore.getState().onboardingComplete;
       const role = useSessionStore.getState().role ?? result.role;
       if (!onboardingComplete) {
@@ -187,14 +223,19 @@ export default function SignInScreen() {
             />
             <PressableScale
               accessibilityLabel="Forgot password"
-              onPress={() =>
-                Alert.alert(
-                  "Reset password",
-                  "Use the Supabase dashboard or add a password reset flow with resetPasswordForEmail.",
-                )}
+              onPress={() => router.push("/(auth)/forgot-password")}
               style={{ alignSelf: "flex-end" }}
             >
               <ThemedText variant="caption" color="secondary">Forgot password?</ThemedText>
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Resend confirmation email"
+              onPress={resendLoading ? undefined : handleResendConfirmation}
+              style={{ alignSelf: "flex-end", marginTop: 6, opacity: resendLoading ? 0.55 : 1 }}
+            >
+              <ThemedText variant="caption" color="muted">
+                {resendLoading ? "Sending…" : "Resend confirmation email"}
+              </ThemedText>
             </PressableScale>
           </View>
 

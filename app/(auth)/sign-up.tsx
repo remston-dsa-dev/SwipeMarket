@@ -17,6 +17,8 @@ import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { HREF_ONBOARDING } from "@/lib/routes";
+import { getEmailConfirmationRedirectTo } from "@/lib/auth-redirect";
+import { setLastSignInEmail } from "@/lib/auth-form-storage";
 import { formatSignUpError, isSignUpEmailAlreadyRegistered } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
@@ -74,6 +76,7 @@ export default function SignUpScreen() {
         email: email.trim().toLowerCase(),
         password,
         options: {
+          emailRedirectTo: getEmailConfirmationRedirectTo(),
           data: {
             role: DEFAULT_SIGNUP_ROLE,
           },
@@ -98,9 +101,10 @@ export default function SignUpScreen() {
       }
 
       if (!data.session) {
+        await setLastSignInEmail(email.trim().toLowerCase());
         Alert.alert(
-          "Check your email",
-          "We sent a confirmation link if this is a new account. Open it, then sign in here.\n\nIf you already have an account, use Sign in instead.",
+          "Confirm your email",
+          "We sent a confirmation link to your inbox. Open it on this device to verify your account, then sign in here.\n\nIn Supabase: Authentication → Providers → Email → enable Confirm email.",
         );
         router.replace("/(auth)/sign-in");
         return;
@@ -109,6 +113,7 @@ export default function SignUpScreen() {
       const user = data.session.user;
       const { role: resolved, onboardingComplete } = await fetchProfileRoleAndOnboarding(user.id);
       setSession(user.id, resolved, onboardingComplete);
+      if (user.email) await setLastSignInEmail(user.email);
       if (!onboardingComplete) {
         router.replace(HREF_ONBOARDING);
         return;
@@ -124,6 +129,12 @@ export default function SignUpScreen() {
     try {
       const result = await signInWithGoogle();
       if (!result.ok) return;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        await setLastSignInEmail(session.user.email.trim().toLowerCase());
+      }
       const onboardingComplete = useSessionStore.getState().onboardingComplete;
       const role = useSessionStore.getState().role ?? result.role;
       if (!onboardingComplete) {
@@ -177,8 +188,8 @@ export default function SignUpScreen() {
 
           <View style={[styles.headingWrap, compact && styles.headingWrapCompact]}>
             <ThemedText variant="title">Create account</ThemedText>
-            <ThemedText variant="body" color="muted">
-              Join thousands of shoppers and sellers
+            <ThemedText variant="caption" color="muted">
+              Join as a shopper or partner after you verify your email.
             </ThemedText>
           </View>
 
@@ -253,6 +264,9 @@ export default function SignUpScreen() {
               {googleLoading ? "Connecting…" : "Sign up with Google"}
             </ThemedText>
           </PressableScale>
+          <ThemedText variant="caption" color="muted" style={{ textAlign: "center", marginBottom: 20, paddingHorizontal: 8 }}>
+            Google verifies your email with Google. You will still choose shopper or partner in onboarding.
+          </ThemedText>
 
           <View style={[styles.footer, compact && styles.footerCompact]}>
             <PressableScale
@@ -300,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 16,
     borderWidth: 1,
-    marginBottom: 28,
+    marginBottom: 10,
   },
   googleBtnCompact: { paddingVertical: 14, marginBottom: 18 },
   footer:      { alignItems: "center", gap: 4 },

@@ -1,6 +1,6 @@
 import { Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { getOAuthRedirectTo } from "@/lib/auth-redirect";
+import { getOAuthRedirectTo, getPasswordRecoveryRedirectTo } from "@/lib/auth-redirect";
 import {
   getSupabaseUrlMisconfigurationMessage,
   isSupabaseConfigured,
@@ -10,10 +10,12 @@ import { supabase } from "@/lib/supabase";
 import type { UserRole } from "@/stores/session-store";
 import { useSessionStore } from "@/stores/session-store";
 
-function extractOAuthParams(url: string): {
+function extractAuthUrlParams(url: string): {
   code?: string;
   access_token?: string;
   refresh_token?: string;
+  token_hash?: string;
+  type?: string;
   error?: string;
   error_description?: string;
 } {
@@ -32,14 +34,25 @@ function extractOAuthParams(url: string): {
     code: merged.code,
     access_token: merged.access_token,
     refresh_token: merged.refresh_token,
+    token_hash: merged.token_hash,
+    type: merged.type,
     error: merged.error,
     error_description: merged.error_description,
   };
 }
 
+const VERIFY_OTP_TYPES = new Set([
+  "signup",
+  "email",
+  "recovery",
+  "invite",
+  "magiclink",
+  "email_change",
+]);
+
 export async function establishSessionFromCallbackUrl(callbackUrl: string) {
-  const { code, access_token, refresh_token, error, error_description } =
-    extractOAuthParams(callbackUrl);
+  const { code, access_token, refresh_token, token_hash, type, error, error_description } =
+    extractAuthUrlParams(callbackUrl);
 
   if (error) {
     throw new Error(error_description || error);
@@ -60,10 +73,20 @@ export async function establishSessionFromCallbackUrl(callbackUrl: string) {
     return;
   }
 
-  throw new Error("Could not complete sign-in (missing authorization code).");
+  if (token_hash && type && VERIFY_OTP_TYPES.has(type)) {
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      token_hash,
+      type: type as "signup" | "email" | "recovery" | "invite" | "magiclink" | "email_change",
+    });
+    if (otpError) throw otpError;
+    return;
+  }
+
+  throw new Error("Could not complete sign-in (missing or invalid link parameters).");
 }
 
-const OAUTH_URL_HINT = /(?:^|[?#])(?:code|access_token|refresh_token|error)=/;
+const AUTH_DEEP_LINK_HINT =
+  /(?:^|[?#])(?:code|access_token|refresh_token|token_hash|error)=/;
 
 /**
  * Completes OAuth when the app is opened on the redirect URL (e.g. `/auth/callback`)
@@ -73,7 +96,7 @@ const OAUTH_URL_HINT = /(?:^|[?#])(?:code|access_token|refresh_token|error)=/;
 export async function completeOAuthSessionFromUrlIfNeeded(
   url: string | null | undefined,
 ): Promise<void> {
-  if (!url || !OAUTH_URL_HINT.test(url)) return;
+  if (!url || !AUTH_DEEP_LINK_HINT.test(url)) return;
 
   const {
     data: { session: existing },
@@ -81,6 +104,17 @@ export async function completeOAuthSessionFromUrlIfNeeded(
   if (existing) return;
 
   await establishSessionFromCallbackUrl(url);
+}
+
+export function urlLooksLikeAuthRedirect(url: string | null | undefined): boolean {
+  return !!url && AUTH_DEEP_LINK_HINT.test(url);
+}
+
+/** Runs {@link completeOAuthSessionFromUrlIfNeeded} for each unique URL (e.g. callback + initial link). */
+export async function completeOAuthSessionFromUrlList(urls: string[]): Promise<void> {
+  for (const u of urls) {
+    await completeOAuthSessionFromUrlIfNeeded(u);
+  }
 }
 
 /**
@@ -106,7 +140,8 @@ export async function signInWithGoogle(): Promise<
 
   const redirectTo = getOAuthRedirectTo();
   if (__DEV__) {
-    console.info("[auth] Supabase Redirect URLs must include:", redirectTo);
+    console.info("[auth] Supabase Redirect URLs — OAuth + email confirm:", redirectTo);
+    console.info("[auth] Supabase Redirect URLs — password reset:", getPasswordRecoveryRedirectTo());
   }
 
   const { data, error } = await supabase.auth.signInWithOAuth({

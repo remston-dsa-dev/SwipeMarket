@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect } from "expo-router";
 import * as Linking from "expo-linking";
-import { completeOAuthSessionFromUrlIfNeeded } from "@/lib/google-auth";
+import { gatherLinkingCandidateUrls } from "@/lib/auth-redirect";
+import { completeOAuthSessionFromUrlList } from "@/lib/google-auth";
 
 /**
- * OAuth redirect target. Session may already be completed in-app via
+ * OAuth + email confirmation redirect target. Session may already be completed in-app via
  * `WebBrowser.openAuthSessionAsync`; if the OS opens this route first, we finish the exchange here.
  */
 export default function AuthCallbackScreen() {
@@ -15,18 +16,8 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const urls = [
-        hookUrl,
-        Linking.getLinkingURL(),
-        await Linking.getInitialURL(),
-      ].filter((u): u is string => Boolean(u));
-      const seen = new Set<string>();
-      for (const u of urls) {
-        if (cancelled) return;
-        if (seen.has(u)) continue;
-        seen.add(u);
-        await completeOAuthSessionFromUrlIfNeeded(u);
-      }
+      const urls = await gatherLinkingCandidateUrls(hookUrl);
+      await completeOAuthSessionFromUrlList(urls);
       if (!cancelled) setReady(true);
     })();
     return () => {

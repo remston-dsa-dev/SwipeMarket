@@ -24,6 +24,8 @@ import {
   displayNameFromUserMetadata,
   googlePictureFromMetadata,
 } from "@/lib/avatar-helpers";
+import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
+import { signOutApp } from "@/lib/sign-out";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatarToStorage } from "@/lib/upload-avatar";
 import { useSessionStore, type UserRole } from "@/stores/session-store";
@@ -107,6 +109,26 @@ export default function OnboardingScreen() {
 
   const avatarImageUri = pickedImageUri ?? remotePhotoUri;
 
+  function confirmSignOut() {
+    Alert.alert(
+      "Sign out?",
+      "You will go back to the welcome screen. Nothing is saved until you tap Continue.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              await signOutApp();
+              router.replace("/");
+            })();
+          },
+        },
+      ],
+    );
+  }
+
   function setChoiceAnimated(next: Choice) {
     setChoice(next);
     scaleShop.value = withSpring(next === "customer" ? 1.03 : 1, { damping: 14, stiffness: 180 });
@@ -132,7 +154,7 @@ export default function OnboardingScreen() {
 
   async function handleContinue() {
     if (!choice || !userId) {
-      Alert.alert("Choose a path", "Pick whether you're here to shop or to sell.");
+      Alert.alert("Choose your role", "Pick shopper or partner to continue.");
       return;
     }
     if (!isGoogle && (!firstName.trim() || !lastName.trim())) {
@@ -142,11 +164,30 @@ export default function OnboardingScreen() {
 
     setSubmitting(true);
     try {
+      const {
+        data: { session: existingSession },
+      } = await supabase.auth.getSession();
+      if (!existingSession) {
+        Alert.alert(
+          "Session expired",
+          "Sign in again to finish setting up your profile.",
+          [{ text: "OK", onPress: () => router.replace("/(auth)/sign-in") }],
+        );
+        return;
+      }
+
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        console.warn("[onboarding] refreshSession", refreshErr.message);
+      }
+      const session = refreshed.session ?? existingSession;
+      const authUserId = session.user.id;
+
       let avatarUrl: string | null = null;
       if (pickedImageUri) {
         setUploadBusy(true);
         try {
-          avatarUrl = await uploadAvatarToStorage(userId, pickedImageUri);
+          avatarUrl = await uploadAvatarToStorage(authUserId, pickedImageUri);
         } finally {
           setUploadBusy(false);
         }
@@ -159,7 +200,7 @@ export default function OnboardingScreen() {
       const fullName =
         `${firstName.trim()} ${lastName.trim()}`.trim() || displayNameFromUserMetadata(meta) || null;
 
-      const { error } = await supabase
+      const { data: saved, error: profileError } = await supabase
         .from("profiles")
         .update({
           role: choice,
@@ -168,15 +209,46 @@ export default function OnboardingScreen() {
           avatar_url: avatarUrl,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", userId);
+        .eq("id", authUserId)
+        .select("id, role, onboarding_complete")
+        .maybeSingle();
 
-      if (error) {
-        Alert.alert("Could not save", error.message);
+      if (profileError) {
+        Alert.alert("Could not save", profileError.message);
+        return;
+      }
+      if (!saved?.id) {
+        Alert.alert(
+          "Could not save",
+          "Your account could not update your profile (often a database access rule). Run the latest migrations on your Supabase project (npm run db:push), then try again.",
+        );
         return;
       }
 
-      setSession(userId, choice, true);
-      router.replace(choice === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
+      let verified = await fetchProfileRoleAndOnboarding(authUserId);
+      for (let attempt = 0; attempt < 6 && !verified.onboardingComplete; attempt++) {
+        await new Promise((r) => setTimeout(r, 220));
+        verified = await fetchProfileRoleAndOnboarding(authUserId);
+      }
+      if (!verified.onboardingComplete) {
+        Alert.alert(
+          "Could not save",
+          "We could not confirm your profile update. Check your connection and try Continue again.",
+        );
+        return;
+      }
+
+      setSession(authUserId, verified.role, true);
+      router.replace(
+        verified.role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
+      );
+
+      const { error: metaError } = await supabase.auth.updateUser({
+        data: { role: verified.role },
+      });
+      if (metaError) {
+        console.warn("[onboarding] auth metadata update", metaError.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -195,6 +267,15 @@ export default function OnboardingScreen() {
         >
           <View style={styles.topBar}>
             <View style={{ flex: 1 }} />
+            {userId ? (
+              <PressableScale
+                accessibilityLabel="Sign out"
+                onPress={confirmSignOut}
+                style={{ paddingVertical: 8, paddingHorizontal: 4, marginRight: 4 }}
+              >
+                <Ionicons name="log-out-outline" size={26} color={theme.colors.textSecondary} />
+              </PressableScale>
+            ) : null}
             <UserAvatar
               imageUri={avatarImageUri}
               displayName={avatarLabel}
@@ -240,16 +321,16 @@ export default function OnboardingScreen() {
           ) : null}
 
           <View style={{ paddingHorizontal: 20, marginTop: 28, gap: 10 }}>
-            <ThemedText variant="label">What brings you here?</ThemedText>
+            <ThemedText variant="label">Shopper or partner?</ThemedText>
             <ThemedText variant="caption" color="muted">
-              Tap a card — it will gently pop forward when selected.
+              Your choice is saved to your profile and used when you sign in.
             </ThemedText>
           </View>
 
           <View style={[styles.cards, { paddingHorizontal: 20 }]}>
             <Animated.View style={shopStyle}>
               <PressableScale
-                accessibilityLabel="I am here to shop"
+                accessibilityLabel="I am a shopper"
                 onPress={() => setChoiceAnimated("customer")}
                 style={[
                   styles.card,
@@ -269,9 +350,9 @@ export default function OnboardingScreen() {
                   <Ionicons name="bag-handle-outline" size={26} color="white" />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
-                  <ThemedText variant="headline">{"I'm here to shop"}</ThemedText>
+                  <ThemedText variant="headline">Shopper</ThemedText>
                   <ThemedText variant="caption" color="muted">
-                    {"Swipe listings, save favorites, and check out when you're ready."}
+                    Swipe listings, save favorites, and check out when you are ready.
                   </ThemedText>
                 </View>
                 {choice === "customer" ? (
@@ -282,7 +363,7 @@ export default function OnboardingScreen() {
 
             <Animated.View style={sellStyle}>
               <PressableScale
-                accessibilityLabel="I am here to partner as a seller"
+                accessibilityLabel="I am a partner seller"
                 onPress={() => setChoiceAnimated("supplier")}
                 style={[
                   styles.card,
@@ -302,7 +383,7 @@ export default function OnboardingScreen() {
                   <Ionicons name="storefront-outline" size={26} color="white" />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
-                  <ThemedText variant="headline">{"I'm here to partner"}</ThemedText>
+                  <ThemedText variant="headline">Partner</ThemedText>
                   <ThemedText variant="caption" color="muted">
                     List products, manage inventory, and grow with SwipeMarket shoppers.
                   </ThemedText>

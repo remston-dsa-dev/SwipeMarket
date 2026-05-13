@@ -1,5 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-import { isProfileOnboardingComplete } from "@/lib/profile-onboarding";
+import { ensureProfileRow, isProfileOnboardingComplete } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import type { UserRole } from "@/stores/session-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -15,11 +15,22 @@ export async function syncSessionFromSupabaseAuth(session: Session | null) {
     return;
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("profiles")
     .select("role, onboarding_complete")
     .eq("id", session.user.id)
     .maybeSingle();
+
+  if (!error && data == null) {
+    await ensureProfileRow(session.user.id);
+    const again = await supabase
+      .from("profiles")
+      .select("role, onboarding_complete")
+      .eq("id", session.user.id)
+      .maybeSingle();
+    data = again.data;
+    error = again.error;
+  }
 
   if (error) {
     console.warn("[auth] profile fetch failed", error.message);
@@ -31,7 +42,28 @@ export async function syncSessionFromSupabaseAuth(session: Session | null) {
     return;
   }
 
-  const role = normalizeRole(data?.role);
-  const onboardingComplete = isProfileOnboardingComplete(data?.onboarding_complete);
+  let profile = data;
+  let onboardingComplete = isProfileOnboardingComplete(profile?.onboarding_complete);
+  const prev = useSessionStore.getState();
+  // Avoid clobbering a just-finished onboarding: USER_UPDATED can run before the profile
+  // row is readable as complete; one short retry fixes read-after-write.
+  if (
+    prev.userId === session.user.id &&
+    prev.onboardingComplete &&
+    !onboardingComplete
+  ) {
+    await new Promise((r) => setTimeout(r, 450));
+    const { data: retryData, error: retryErr } = await supabase
+      .from("profiles")
+      .select("role, onboarding_complete")
+      .eq("id", session.user.id)
+      .maybeSingle();
+    if (!retryErr && retryData) {
+      profile = retryData;
+      onboardingComplete = isProfileOnboardingComplete(retryData.onboarding_complete);
+    }
+  }
+
+  const role = normalizeRole(profile?.role);
   useSessionStore.getState().setSession(session.user.id, role, onboardingComplete);
 }
