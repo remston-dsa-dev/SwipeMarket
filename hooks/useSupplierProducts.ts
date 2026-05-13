@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
 import { rowToProduct } from "@/lib/product-map";
 import { supabase } from "@/lib/supabase";
 import type { Product } from "@/types/product";
@@ -31,7 +32,7 @@ export function useSupplierProducts(supplierId: string | null) {
     if (!enabled || !supplierId) return;
 
     const channel = supabase
-      .channel(`supplier-products-${supplierId}`)
+      .channel(`supplier-products-${supplierId}-${uniqueRealtimeTopic()}`)
       .on(
         "postgres_changes",
         {

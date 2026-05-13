@@ -83,6 +83,7 @@ export default function CartScreen() {
                 clearCart();
                 void queryClient.invalidateQueries({ queryKey: ["listings"] });
                 void queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
+                void queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
                 router.back();
               } catch (e) {
                 Alert.alert("Checkout failed", (e as Error).message);

@@ -129,6 +129,68 @@ export type Database = {
           updated_at?: string;
         };
       };
+      orders: {
+        Row: {
+          id: string;
+          customer_id: string;
+          supplier_id: string;
+          status: string;
+          total_cents: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          supplier_id: string;
+          status?: string;
+          total_cents?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          customer_id?: string;
+          supplier_id?: string;
+          status?: string;
+          total_cents?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          product_id: string;
+          qty: number;
+          unit_price_cents: number;
+          title: string;
+          image_url: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          product_id: string;
+          qty: number;
+          unit_price_cents: number;
+          title: string;
+          image_url: string;
+        };
+        Update: {
+          order_id?: string;
+          product_id?: string;
+          qty?: number;
+          unit_price_cents?: number;
+          title?: string;
+          image_url?: string;
+        };
+      };
+    };
+    Functions: {
+      supplier_set_order_status: {
+        Args: { p_order_id: string; p_status: string };
+        Returns: undefined;
+      };
     };
   };
 };

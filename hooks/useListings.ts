@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
 import { productToListing, rowToProduct } from "@/lib/product-map";
 import { supabase } from "@/lib/supabase";
 import type { Listing } from "@/types/listing";
@@ -32,7 +33,7 @@ export function useListings() {
     if (!enabled) return;
 
     const channel = supabase
-      .channel("listings-products-realtime")
+      .channel(`listings-products-${uniqueRealtimeTopic()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products", filter: "published=eq.true" },

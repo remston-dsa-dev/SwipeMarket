@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -129,7 +129,7 @@ export default function AddProductScreen() {
             >
               <ThemedText variant="caption">Cancel</ThemedText>
             </PressableScale>
-            <HeaderProfileAvatar />
+            <SupplierHeaderActions />
           </View>
         </View>
 

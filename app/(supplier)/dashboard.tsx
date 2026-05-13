@@ -5,7 +5,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Image } from "expo-image";
-import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { PressableScale } from "@/components/PressableScale";
 import { ProductRow } from "@/components/ProductRow";
 import { Screen } from "@/components/Screen";
@@ -171,7 +171,7 @@ export default function SupplierDashboardScreen() {
           </ThemedText>
         </View>
 
-        <HeaderProfileAvatar />
+        <SupplierHeaderActions />
       </View>
 
       <View style={{ gap: 10, marginBottom: 16 }}>

@@ -16,6 +16,9 @@ export default function SupplierLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="dashboard" />
+      <Stack.Screen name="orders" />
+      <Stack.Screen name="returns" />
+      <Stack.Screen name="more" />
       <Stack.Screen name="add-product" options={{ presentation: "modal" }} />
     </Stack>
   );
