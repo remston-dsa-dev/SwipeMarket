@@ -20,6 +20,7 @@ export function rowToProduct(row: ProductRow): Product {
     variants: row.variants.length ? row.variants : undefined,
     unit: row.unit ?? undefined,
     qtyAllocated: row.qty_allocated,
+    qtyOnHold: row.qty_on_hold,
   };
 }
 

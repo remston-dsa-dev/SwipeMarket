@@ -52,6 +52,9 @@ export type Database = {
           variants: string[];
           unit: string | null;
           qty_allocated: number;
+          qty_on_hold: number;
+          /** Generated: stock - qty_on_hold - qty_allocated */
+          available_units: number;
           published: boolean;
           created_at: string;
           updated_at: string;
@@ -72,6 +75,7 @@ export type Database = {
           variants?: string[];
           unit?: string | null;
           qty_allocated?: number;
+          qty_on_hold?: number;
           published?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -90,7 +94,38 @@ export type Database = {
           variants?: string[];
           unit?: string | null;
           qty_allocated?: number;
+          qty_on_hold?: number;
           published?: boolean;
+          updated_at?: string;
+        };
+      };
+      customer_cart_lines: {
+        Row: {
+          customer_id: string;
+          product_id: string;
+          qty: number;
+          title: string;
+          price_label: string;
+          image_url: string;
+          unit_price_cents: number;
+          updated_at: string;
+        };
+        Insert: {
+          customer_id: string;
+          product_id: string;
+          qty: number;
+          title: string;
+          price_label: string;
+          image_url: string;
+          unit_price_cents: number;
+          updated_at?: string;
+        };
+        Update: {
+          qty?: number;
+          title?: string;
+          price_label?: string;
+          image_url?: string;
+          unit_price_cents?: number;
           updated_at?: string;
         };
       };

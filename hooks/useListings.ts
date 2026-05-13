@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { productToListing, rowToProduct } from "@/lib/product-map";
 import { supabase } from "@/lib/supabase";
@@ -9,7 +10,7 @@ async function fetchListings(): Promise<Listing[]> {
     .from("products")
     .select("*")
     .eq("published", true)
-    .gt("stock", 0)
+    .gt("available_units", 0)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -18,6 +19,7 @@ async function fetchListings(): Promise<Listing[]> {
 
 export function useListings() {
   const enabled = isSupabaseConfigured();
+  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["listings"],
@@ -25,6 +27,25 @@ export function useListings() {
     enabled,
     staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const channel = supabase
+      .channel("listings-products-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products", filter: "published=eq.true" },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["listings"] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [enabled, queryClient]);
 
   return {
     data: query.data ?? [],

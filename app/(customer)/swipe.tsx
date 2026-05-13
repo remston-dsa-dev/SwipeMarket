@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, Modal, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -11,6 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { ListingCard } from "@/components/ListingCard";
 import { PressableScale } from "@/components/PressableScale";
@@ -19,6 +28,8 @@ import { Screen } from "@/components/Screen";
 import { SwipeCard } from "@/components/SwipeCard";
 import { ThemedText } from "@/components/ThemedText";
 import { useListings } from "@/hooks/useListings";
+import { fetchMyCartLines, setCartLineQtyRemote } from "@/lib/cart-remote";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { signOutApp } from "@/lib/sign-out";
 import { useCartStore } from "@/stores/cart-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -35,8 +46,9 @@ const PRICE_BUCKETS = [
 ] as const;
 
 export default function SwipeScreen() {
-  const router       = useRouter();
-  const theme        = useTheme();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const theme = useTheme();
   const { data: listings, isLoading: listingsLoading } = useListings();
   const addItem    = useCartStore((s) => s.addItem);
   const cartItems  = useCartStore((s) => s.items);
@@ -229,20 +241,37 @@ export default function SwipeScreen() {
     };
   });
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!sheetListing) return;
-    addItem(
-      {
-        listingId:      sheetListing.id,
-        title:          sheetListing.title,
-        priceLabel:     sheetListing.priceLabel,
-        imageUrl:       sheetListing.imageUrl,
-        unitPriceCents: sheetListing.unitPriceCents,
-      },
-      qty,
-    );
-    setSheetListing(null);
-    dismissRight();
+    if (!isSupabaseConfigured()) {
+      addItem(
+        {
+          listingId: sheetListing.id,
+          title: sheetListing.title,
+          priceLabel: sheetListing.priceLabel,
+          imageUrl: sheetListing.imageUrl,
+          unitPriceCents: sheetListing.unitPriceCents,
+        },
+        qty,
+      );
+      setSheetListing(null);
+      dismissRight();
+      return;
+    }
+    try {
+      const existing =
+        useCartStore.getState().items.find((i) => i.listingId === sheetListing.id)?.qty ?? 0;
+      await setCartLineQtyRemote(sheetListing.id, existing + qty);
+      const lines = await fetchMyCartLines();
+      useCartStore.getState().replaceFromServer(lines);
+      void queryClient.invalidateQueries({ queryKey: ["listings"] });
+      void queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
+      setSheetListing(null);
+      dismissRight();
+    } catch (e) {
+      Alert.alert("Could not reserve", (e as Error).message);
+      handleSkip();
+    }
   }
 
   function handleSkip() {

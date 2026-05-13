@@ -13,4 +13,6 @@ export type Product = {
   variants?: string[];
   unit?: string;
   qtyAllocated?: number;
+  /** Units reserved in shopper carts (server). */
+  qtyOnHold?: number;
 };

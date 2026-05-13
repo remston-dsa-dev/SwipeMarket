@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { useCartStore } from "@/stores/cart-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 import type { Product } from "@/types/product";
@@ -24,12 +23,9 @@ export function ProductRow({ product }: Props) {
   const theme = useTheme();
   const queryClient = useQueryClient();
   const supplierId = useSessionStore((s) => s.userId);
-  const cartItems = useCartStore((s) => s.items);
-  const qtyOnHold = cartItems
-    .filter((item) => item.listingId === product.id)
-    .reduce((sum, item) => sum + item.qty, 0);
+  const qtyOnHold = product.qtyOnHold ?? 0;
   const qtyAllocated = product.qtyAllocated ?? 0;
-  const qtyAvailable = Math.max(0, product.stock - qtyOnHold);
+  const qtyAvailable = Math.max(0, product.stock - qtyOnHold - qtyAllocated);
   const color = stockColor(product.stock);
   const [busy, setBusy] = useState(false);
 
@@ -62,12 +58,18 @@ export function ProductRow({ product }: Props) {
       if (error) throw error;
     },
     onSuccess: invalidate,
-    onError: (e: Error) => Alert.alert("Delete failed", e.message),
+    onError: (e: Error) => {
+      const msg = e.message.toLowerCase().includes("cart")
+        ? "This SKU is still in a shopper cart. When the last cart line is removed, you can delete it."
+        : e.message;
+      Alert.alert("Delete failed", msg);
+    },
   });
 
   function adjustStock(delta: number) {
     if (busy) return;
-    if (delta < 0 && qtyAvailable <= 0) return;
+    const nextStock = product.stock + delta;
+    if (delta < 0 && nextStock < qtyOnHold + qtyAllocated) return;
     setBusy(true);
     adjustMutation.mutate(delta, {
       onSettled: () => setBusy(false),

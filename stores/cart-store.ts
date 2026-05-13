@@ -9,6 +9,8 @@ type CartState = {
   removeItem: (listingId: string) => void;
   updateQty: (listingId: string, qty: number) => void;
   clearCart: () => void;
+  /** Replace cart from server (snake_case rows already mapped). */
+  replaceFromServer: (items: CartItem[]) => void;
   totalCents: number;
 };
 
@@ -65,6 +67,11 @@ export const useCartStore = create<CartState>()(
           };
         }),
       clearCart: () => set({ items: [], totalCents: 0 }),
+      replaceFromServer: (items) =>
+        set({
+          items,
+          totalCents: items.reduce((sum, i) => sum + i.qty * i.unitPriceCents, 0),
+        }),
     }),
     {
       name: "swipemarket-cart",

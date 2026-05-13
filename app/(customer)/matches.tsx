@@ -1,15 +1,23 @@
 import { Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { CartItemRow } from "@/components/CartItemRow";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
+import {
+  checkoutCartRemote,
+  clearMyServerCart,
+  setCartLineQtyRemote,
+} from "@/lib/cart-remote";
+import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { useCartStore } from "@/stores/cart-store";
 import { useTheme } from "@/theme/ThemeContext";
 
 export default function CartScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const theme = useTheme();
   const items = useCartStore((s) => s.items);
   const totalCents = useCartStore((s) => s.totalCents);
@@ -17,20 +25,71 @@ export default function CartScreen() {
   const clearCart = useCartStore((s) => s.clearCart);
   const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
 
+  async function removeLineFromCart(listingId: string) {
+    if (isSupabaseConfigured()) {
+      try {
+        await setCartLineQtyRemote(listingId, 0);
+      } catch (e) {
+        Alert.alert("Could not update cart", (e as Error).message);
+        return;
+      }
+    }
+    removeItem(listingId);
+  }
+
+  async function clearEntireCart() {
+    if (isSupabaseConfigured()) {
+      try {
+        await clearMyServerCart();
+      } catch (e) {
+        Alert.alert("Could not clear cart", (e as Error).message);
+        return;
+      }
+    }
+    clearCart();
+  }
+
   function handleCheckout() {
+    if (!isSupabaseConfigured()) {
+      Alert.alert(
+        "Demo checkout",
+        "Connect Supabase in .env to reserve inventory on swipes and allocate on checkout.",
+        [
+          {
+            text: "Clear cart",
+            style: "destructive",
+            onPress: () => {
+              clearCart();
+              router.back();
+            },
+          },
+          { text: "Keep shopping", onPress: () => router.back() },
+        ],
+      );
+      return;
+    }
+
     Alert.alert(
-      "Demo checkout",
-      "Your cart is stored on this device only. Connecting checkout to Stripe and deducting stock in Supabase will ship with the orders API.",
+      "Complete checkout?",
+      "This will move cart quantities from on-hold to allocated for suppliers.",
       [
+        { text: "Cancel", style: "cancel" },
         {
-          text: "Clear cart",
-          style: "destructive",
+          text: "Checkout",
           onPress: () => {
-            clearCart();
-            router.back();
+            void (async () => {
+              try {
+                await checkoutCartRemote();
+                clearCart();
+                void queryClient.invalidateQueries({ queryKey: ["listings"] });
+                void queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
+                router.back();
+              } catch (e) {
+                Alert.alert("Checkout failed", (e as Error).message);
+              }
+            })();
           },
         },
-        { text: "Keep shopping", onPress: () => router.back() },
       ],
     );
   }
@@ -62,7 +121,7 @@ export default function CartScreen() {
               onPress={() =>
                 Alert.alert("Clear cart?", "Remove all items?", [
                   { text: "Cancel", style: "cancel" },
-                  { text: "Clear", style: "destructive", onPress: clearCart },
+                  { text: "Clear", style: "destructive", onPress: () => void clearEntireCart() },
                 ])
               }
               style={{
@@ -127,7 +186,7 @@ export default function CartScreen() {
             data={items}
             keyExtractor={(item) => item.listingId}
             renderItem={({ item }) => (
-              <CartItemRow item={item} onRemove={removeItem} />
+              <CartItemRow item={item} onRemove={() => void removeLineFromCart(item.listingId)} />
             )}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
