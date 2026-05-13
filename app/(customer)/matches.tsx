@@ -2,7 +2,7 @@ import { Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CartItemRow } from "@/components/CartItemRow";
-import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -84,6 +84,7 @@ export default function CartScreen() {
                 void queryClient.invalidateQueries({ queryKey: ["listings"] });
                 void queryClient.invalidateQueries({ queryKey: ["supplier-products"] });
                 void queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
+                void queryClient.invalidateQueries({ queryKey: ["customer-orders"] });
                 router.back();
               } catch (e) {
                 Alert.alert("Checkout failed", (e as Error).message);
@@ -153,7 +154,7 @@ export default function CartScreen() {
             <ThemedText variant="caption">← Back</ThemedText>
           </PressableScale>
 
-          <HeaderProfileAvatar />
+          <CustomerHeaderActions />
         </View>
       </View>
 

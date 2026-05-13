@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { ListingCard } from "@/components/ListingCard";
 import { PressableScale } from "@/components/PressableScale";
 import { QuantitySheet } from "@/components/QuantitySheet";
@@ -356,7 +356,7 @@ export default function SwipeScreen() {
             )}
           </PressableScale>
 
-          <HeaderProfileAvatar />
+          <CustomerHeaderActions />
         </View>
       </View>
 

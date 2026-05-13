@@ -29,5 +29,12 @@ export default function CustomerLayout() {
   if (!onboardingComplete) return <Redirect href={HREF_ONBOARDING} />;
   if (role !== "customer") return <Redirect href="/(supplier)/dashboard" />;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="swipe" />
+      <Stack.Screen name="matches" />
+      <Stack.Screen name="orders" />
+      <Stack.Screen name="more" />
+    </Stack>
+  );
 }
