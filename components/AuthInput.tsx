@@ -148,11 +148,27 @@ export function AuthInput({
         <View style={styles.labelRow}>
           <ThemedText
             variant="caption"
-            style={{ color: theme.colors.textSecondary, fontWeight: "600" }}
+            style={[
+              styles.labelText,
+              { color: error ? STATUS_ERROR : theme.colors.textSecondary },
+            ]}
           >
             {label}
           </ThemedText>
-          {labelAction}
+          {showError ? (
+            <View style={styles.labelErrorSlot}>
+              <Ionicons name="alert-circle" size={12} color={STATUS_ERROR} />
+              <ThemedText
+                variant="caption"
+                numberOfLines={1}
+                style={styles.labelErrorText}
+              >
+                {error}
+              </ThemedText>
+            </View>
+          ) : (
+            labelAction
+          )}
         </View>
       ) : null}
 
@@ -190,8 +206,6 @@ export function AuthInput({
           <View style={styles.successBadge}>
             <Ionicons name="checkmark-sharp" size={11} color="#FFFFFF" />
           </View>
-        ) : showError ? (
-          <Ionicons name="alert-circle" size={16} color={STATUS_ERROR} />
         ) : null}
 
         {isPassword && (
@@ -209,7 +223,10 @@ export function AuthInput({
         )}
       </Animated.View>
 
-      {error ? (
+      {/* Fallback for label-less inputs (forgot/reset password) — keep the
+          below-input error row so failures stay visible. When a label is
+          provided, errors render inline next to the label instead. */}
+      {!label && showError ? (
         <View style={styles.errorRow}>
           <Ionicons name="information-circle" size={13} color={STATUS_ERROR} />
           <ThemedText variant="caption" style={{ color: STATUS_ERROR }}>
@@ -236,6 +253,17 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginRight: 4,
   },
+  labelText: { fontWeight: "600", flexShrink: 0 },
+  labelErrorSlot: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    minWidth: 0,
+  },
+  labelErrorText: { color: STATUS_ERROR, flexShrink: 1 },
+  errorRow: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 4 },
   input: { flex: 1, paddingVertical: 16, fontSize: 16 },
   successBadge: {
     width: 18,
@@ -245,5 +273,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  errorRow: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 4 },
 });

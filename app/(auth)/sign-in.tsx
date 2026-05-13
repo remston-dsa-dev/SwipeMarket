@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthInput } from "@/components/AuthInput";
@@ -16,13 +19,13 @@ import { GoogleLogoMark } from "@/components/GoogleLogoMark";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { getEmailConfirmationRedirectTo } from "@/lib/auth-redirect";
 import { getLastSignInEmail, setLastSignInEmail } from "@/lib/auth-form-storage";
 import { formatSignInError } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
+import { emailScore, validateEmail } from "@/lib/validation";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -35,9 +38,9 @@ export default function SignInScreen() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [errors,   setErrors]   = useState<{ email?: string; password?: string }>({});
+  const [emailFocused,  setEmailFocused]  = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -46,18 +49,31 @@ export default function SignInScreen() {
     })();
   }, []);
 
+  const emailValid    = useMemo(() => validateEmail(email) === null, [email]);
+  const emailProgress = useMemo(() => emailScore(email), [email]);
+  const formValid     = emailValid && password.length > 0;
+
+  function clearFieldError(field: keyof typeof errors) {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
+
+  function handleEmailChange(value: string) {
+    setEmail(value);
+    clearFieldError("email");
+  }
+
+  function handlePasswordChange(value: string) {
+    setPassword(value);
+    clearFieldError("password");
+  }
+
   function validate() {
-    const e: typeof errors = {};
-    if (!email.trim())
-      e.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(email.trim()))
-      e.email = "Enter a valid email address";
-    if (!password)
-      e.password = "Password is required";
-    else if (password.length < 6)
-      e.password = "At least 6 characters";
+    const e: typeof errors = {
+      email:    validateEmail(email)   ?? undefined,
+      password: !password ? "Password is required" : undefined,
+    };
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return !e.email && !e.password;
   }
 
   async function handleSignIn() {
@@ -103,30 +119,6 @@ export default function SignInScreen() {
     }
   }
 
-  async function handleResendConfirmation() {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !/\S+@\S+\.\S+/.test(trimmed)) {
-      Alert.alert("Email required", "Enter the email you used to sign up, then tap resend.");
-      return;
-    }
-    if (!isSupabaseConfigured()) return;
-    setResendLoading(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: trimmed,
-        options: { emailRedirectTo: getEmailConfirmationRedirectTo() },
-      });
-      if (error) {
-        Alert.alert("Could not resend", error.message);
-        return;
-      }
-      Alert.alert("Email sent", "Check your inbox for a new confirmation link.");
-    } finally {
-      setResendLoading(false);
-    }
-  }
-
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     try {
@@ -154,8 +146,11 @@ export default function SignInScreen() {
     router.replace("/");
   }
 
-  const isLight = theme.scheme === "light";
-  const compact = height < 780;
+  const isLight     = theme.scheme === "light";
+  const compact     = height < 780;
+  const ctaDisabled = loading || !formValid;
+  /* Show the green check only after the user leaves the email field. */
+  const showEmailValid = emailValid && email.length > 0 && !emailFocused;
 
   return (
     <SafeAreaView
@@ -170,85 +165,123 @@ export default function SignInScreen() {
           <PressableScale
             accessibilityLabel="Back"
             onPress={handleBackPress}
-            style={styles.backBtn}
+            style={[
+              styles.backBtn,
+              {
+                backgroundColor:
+                  theme.scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.04)",
+              },
+            ]}
           >
-            <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={theme.colors.textPrimary} />
           </PressableScale>
         </View>
 
-        <View style={[styles.content, compact && styles.contentCompact]}>
+        <ScrollView
+          contentContainerStyle={[styles.content, compact && styles.contentCompact]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={[styles.logoWrap, compact && styles.logoWrapCompact]}>
             <Logo size={compact ? "sm" : "md"} showWordmark lightBackground={isLight} />
           </View>
 
           <View style={[styles.headingWrap, compact && styles.headingWrapCompact]}>
             <ThemedText variant="title">Welcome back</ThemedText>
-            <ThemedText variant="body" color="muted">Sign in to continue</ThemedText>
+            <ThemedText variant="caption" color="muted">
+              Sign in to continue swiping.
+            </ThemedText>
           </View>
 
           <View style={[styles.fields, compact && styles.fieldsCompact]}>
             <AuthInput
+              label="Email"
               icon="mail-outline"
-              placeholder="Email address"
+              placeholder="you@example.com"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               autoComplete="email"
+              textContentType="emailAddress"
               returnKeyType="next"
+              progress={emailProgress}
+              valid={showEmailValid}
               error={errors.email}
             />
+
             <AuthInput
+              label="Password"
               icon="lock-closed-outline"
-              placeholder="Password"
+              placeholder="Your password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={handlePasswordChange}
               isPassword
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password"
+              textContentType="password"
               returnKeyType="done"
               onSubmitEditing={handleSignIn}
               error={errors.password}
             />
+
             <PressableScale
               accessibilityLabel="Forgot password"
               onPress={() => router.push("/(auth)/forgot-password")}
-              style={{ alignSelf: "flex-end" }}
+              style={styles.forgotBtn}
             >
-              <ThemedText variant="caption" color="secondary">Forgot password?</ThemedText>
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel="Resend confirmation email"
-              onPress={resendLoading ? undefined : handleResendConfirmation}
-              style={{ alignSelf: "flex-end", marginTop: 6, opacity: resendLoading ? 0.55 : 1 }}
-            >
-              <ThemedText variant="caption" color="muted">
-                {resendLoading ? "Sending…" : "Resend confirmation email"}
+              <ThemedText variant="caption" color="secondary" style={{ fontWeight: "600" }}>
+                Forgot password?
               </ThemedText>
             </PressableScale>
           </View>
 
           <PressableScale
-            accessibilityLabel="Continue"
-            onPress={handleSignIn}
-            style={[
-              styles.ctaBtn,
-              compact && styles.ctaBtnCompact,
-              { backgroundColor: loading ? theme.colors.border : theme.colors.primary },
-            ]}
+            accessibilityLabel="Sign in"
+            accessibilityState={{ disabled: ctaDisabled }}
+            onPress={loading ? undefined : handleSignIn}
+            style={[styles.ctaShadow, compact && styles.ctaShadowCompact]}
           >
-            <ThemedText variant="label" color="onPrimary">
-              {loading ? "Signing in…" : "Continue"}
-            </ThemedText>
+            <LinearGradient
+              colors={
+                ctaDisabled
+                  ? [theme.colors.border, theme.colors.border]
+                  : [theme.colors.primary, theme.colors.secondary]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.ctaBtn, compact && styles.ctaBtnCompact]}
+            >
+              {loading ? (
+                <ActivityIndicator color={theme.colors.textOnPrimary} />
+              ) : (
+                <>
+                  <ThemedText variant="label" color="onPrimary">
+                    Sign In
+                  </ThemedText>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={18}
+                    color={theme.colors.textOnPrimary}
+                  />
+                </>
+              )}
+            </LinearGradient>
           </PressableScale>
 
           <View style={[styles.oauthDivider, compact && styles.oauthDividerCompact]}>
             <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
-            <ThemedText variant="caption" color="muted">or</ThemedText>
+            <ThemedText variant="caption" color="muted">or continue with</ThemedText>
             <View style={[styles.oauthLine, { backgroundColor: theme.colors.border }]} />
           </View>
 
           <PressableScale
             accessibilityLabel="Sign in with Google"
-            onPress={handleGoogleSignIn}
+            onPress={googleLoading || loading ? undefined : handleGoogleSignIn}
             style={[
               styles.googleBtn,
               compact && styles.googleBtnCompact,
@@ -259,7 +292,7 @@ export default function SignInScreen() {
               },
             ]}
           >
-            <GoogleLogoMark size={22} />
+            <GoogleLogoMark size={20} />
             <ThemedText variant="label" style={{ color: isLight ? "#1F1F1F" : theme.colors.textPrimary }}>
               {googleLoading ? "Connecting…" : "Sign in with Google"}
             </ThemedText>
@@ -272,37 +305,58 @@ export default function SignInScreen() {
             >
               <Text style={{ color: theme.colors.textSecondary, fontSize: 15 }}>
                 New to SwipeMarket?{" "}
-                <Text style={{ color: theme.colors.secondary, fontWeight: "600" }}>Create account</Text>
+                <Text style={{ color: theme.colors.secondary, fontWeight: "700" }}>Create account</Text>
               </Text>
             </PressableScale>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  backRow:     { paddingHorizontal: 20, paddingTop: 8 },
-  backBtn:     { alignSelf: "flex-start", padding: 4 },
-  content:     { flex: 1, paddingHorizontal: 24, paddingBottom: 24 },
-  contentCompact: { paddingBottom: 16 },
-  logoWrap:    { alignItems: "center", marginTop: 20, marginBottom: 36 },
-  logoWrapCompact: { marginTop: 8, marginBottom: 20 },
-  headingWrap: { gap: 6, marginBottom: 28 },
-  headingWrapCompact: { marginBottom: 18 },
-  fields:      { gap: 14, marginBottom: 28 },
-  fieldsCompact: { gap: 10, marginBottom: 18 },
-  ctaBtn:      { borderRadius: 999, paddingVertical: 18, alignItems: "center", marginBottom: 20 },
-  ctaBtnCompact: { paddingVertical: 14, marginBottom: 14 },
-  oauthDivider: {
+  backRow:        { paddingHorizontal: 20, paddingTop: 8 },
+  backBtn:        {
+    alignSelf: "flex-start",
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content:        { paddingHorizontal: 24, paddingBottom: 32 },
+  contentCompact: { paddingBottom: 20 },
+  logoWrap:       { alignItems: "center", marginTop: 16, marginBottom: 28 },
+  logoWrapCompact:{ marginTop: 6, marginBottom: 16 },
+  headingWrap:    { gap: 6, marginBottom: 24 },
+  headingWrapCompact: { marginBottom: 16 },
+  fields:         { gap: 14, marginBottom: 24 },
+  fieldsCompact:  { gap: 10, marginBottom: 16 },
+  forgotBtn: { alignSelf: "flex-end", paddingHorizontal: 4, marginTop: 2 },
+  ctaShadow: {
+    borderRadius: 999,
+    marginBottom: 18,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  ctaShadowCompact: { marginBottom: 14 },
+  ctaBtn: {
+    borderRadius: 999,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
+    justifyContent: "center",
+    gap: 8,
   },
+  ctaBtnCompact:  { paddingVertical: 14 },
+  oauthDivider:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 18 },
   oauthDividerCompact: { marginBottom: 14 },
-  oauthLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  oauthLine:      { flex: 1, height: StyleSheet.hairlineWidth },
   googleBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -311,9 +365,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 16,
     borderWidth: 1,
-    marginBottom: 28,
+    marginBottom: 22,
   },
-  googleBtnCompact: { paddingVertical: 14, marginBottom: 18 },
-  footer:      { alignItems: "center", gap: 4 },
-  footerCompact: { gap: 0 },
+  googleBtnCompact: { paddingVertical: 14, marginBottom: 16 },
+  footer:         { alignItems: "center", gap: 4 },
+  footerCompact:  { gap: 0 },
 });

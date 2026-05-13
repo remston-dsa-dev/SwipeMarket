@@ -88,7 +88,13 @@ export default function SignUpScreen() {
   }
 
   async function handleCreate() {
-    if (!validate()) return;
+    if (!validate()) {
+      /* When the user has typed *something* for the password but it's still
+         weak, pop the rules sheet so the requirements are unambiguous. Empty
+         password and email errors are already surfaced inline. */
+      if (password.length > 0 && !passwordValid) setRulesOpen(true);
+      return;
+    }
 
     if (!isSupabaseConfigured()) {
       Alert.alert(
@@ -276,7 +282,8 @@ export default function SignUpScreen() {
 
           <PressableScale
             accessibilityLabel="Create account"
-            onPress={ctaDisabled ? undefined : handleCreate}
+            accessibilityState={{ disabled: ctaDisabled }}
+            onPress={loading ? undefined : handleCreate}
             style={[styles.ctaShadow, compact && styles.ctaShadowCompact]}
           >
             <LinearGradient

@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
-import { Pressable, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Pressable,
+  type AccessibilityState,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,6 +18,7 @@ type Props = {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  accessibilityState?: AccessibilityState;
 };
 
 export function PressableScale({
@@ -20,6 +26,7 @@ export function PressableScale({
   onPress,
   style,
   accessibilityLabel,
+  accessibilityState,
 }: Props) {
   const scale = useSharedValue(1);
 
@@ -31,6 +38,7 @@ export function PressableScale({
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityState}
       onPress={onPress}
       onPressIn={() => {
         scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
