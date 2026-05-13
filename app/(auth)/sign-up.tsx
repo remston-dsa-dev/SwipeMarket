@@ -16,8 +16,11 @@ import { GoogleLogoMark } from "@/components/GoogleLogoMark";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { HREF_ONBOARDING } from "@/lib/routes";
+import { formatSignUpError, isSignUpEmailAlreadyRegistered } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore, type UserRole } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -78,28 +81,38 @@ export default function SignUpScreen() {
       });
 
       if (error) {
-        Alert.alert("Sign up failed", error.message);
+        Alert.alert("Sign up failed", formatSignUpError(error.message));
+        return;
+      }
+
+      if (data.user && isSignUpEmailAlreadyRegistered(data.user)) {
+        Alert.alert(
+          "Account already exists",
+          "Sign in with your email and password or use Google.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Go to sign in", onPress: () => router.replace("/(auth)/sign-in") },
+          ],
+        );
         return;
       }
 
       if (!data.session) {
         Alert.alert(
           "Check your email",
-          "We sent a confirmation link. After confirming, sign in on this device.",
+          "We sent a confirmation link if this is a new account. Open it, then sign in here.\n\nIf you already have an account, use Sign in instead.",
         );
         router.replace("/(auth)/sign-in");
         return;
       }
 
       const user = data.session.user;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const resolved = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
-      setSession(user.id, resolved);
+      const { role: resolved, onboardingComplete } = await fetchProfileRoleAndOnboarding(user.id);
+      setSession(user.id, resolved, onboardingComplete);
+      if (!onboardingComplete) {
+        router.replace(HREF_ONBOARDING);
+        return;
+      }
       router.replace(resolved === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
     } finally {
       setLoading(false);
@@ -111,8 +124,14 @@ export default function SignUpScreen() {
     try {
       const result = await signInWithGoogle();
       if (!result.ok) return;
+      const onboardingComplete = useSessionStore.getState().onboardingComplete;
+      const role = useSessionStore.getState().role ?? result.role;
+      if (!onboardingComplete) {
+        router.replace(HREF_ONBOARDING);
+        return;
+      }
       router.replace(
-        result.role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
+        role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
       );
     } catch {
       /* Alert shown in signInWithGoogle */

@@ -14,18 +14,24 @@ export type Database = {
           id: string;
           role: "customer" | "supplier";
           full_name: string | null;
+          onboarding_complete: boolean;
+          avatar_url: string | null;
           updated_at: string;
         };
         Insert: {
           id: string;
           role: "customer" | "supplier";
           full_name?: string | null;
+          onboarding_complete?: boolean;
+          avatar_url?: string | null;
           updated_at?: string;
         };
         Update: {
           id?: string;
           role?: "customer" | "supplier";
           full_name?: string | null;
+          onboarding_complete?: boolean;
+          avatar_url?: string | null;
           updated_at?: string;
         };
       };

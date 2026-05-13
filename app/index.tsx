@@ -15,14 +15,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
+import { HREF_ONBOARDING } from "@/lib/routes";
 import { useSessionStore } from "@/stores/session-store";
 
 const { height: H } = Dimensions.get("window");
 
 export default function Index() {
-  const userId          = useSessionStore((s) => s.userId);
-  const role            = useSessionStore((s) => s.role);
-  const authInitialized = useSessionStore((s) => s.authInitialized);
+  const userId               = useSessionStore((s) => s.userId);
+  const role                 = useSessionStore((s) => s.role);
+  const onboardingComplete   = useSessionStore((s) => s.onboardingComplete);
+  const authInitialized      = useSessionStore((s) => s.authInitialized);
 
   if (!authInitialized) {
     return (
@@ -33,6 +35,9 @@ export default function Index() {
   }
 
   if (userId) {
+    if (!onboardingComplete) {
+      return <Redirect href={HREF_ONBOARDING} />;
+    }
     return (
       <Redirect
         href={role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe"}

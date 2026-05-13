@@ -16,8 +16,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     supportsTablet: true,
+    bundleIdentifier: "com.swipemarket.app",
   },
   android: {
+    package: "com.swipemarket.app",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#ffffff",
@@ -29,6 +31,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-web-browser",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "SwipeMarket uses your photo for your profile picture.",
+      },
+    ],
     "expo-router",
     [
       "@stripe/stripe-react-native",

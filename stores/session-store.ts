@@ -7,9 +7,11 @@ export type UserRole = "customer" | "supplier";
 export type SessionState = {
   userId: string | null;
   role: UserRole | null;
+  /** From Supabase `profiles.onboarding_complete`; not persisted — refreshed on each auth sync. */
+  onboardingComplete: boolean;
   /** False until first Supabase getSession / listener sync finishes (or skips if Supabase unset). */
   authInitialized: boolean;
-  setSession: (userId: string, role: UserRole) => void;
+  setSession: (userId: string, role: UserRole, onboardingComplete: boolean) => void;
   clearSession: () => void;
   setAuthInitialized: (value: boolean) => void;
 };
@@ -19,9 +21,12 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       userId: null,
       role: null,
+      onboardingComplete: false,
       authInitialized: false,
-      setSession: (userId, role) => set({ userId, role }),
-      clearSession: () => set({ userId: null, role: null }),
+      setSession: (userId, role, onboardingComplete) =>
+        set({ userId, role, onboardingComplete }),
+      clearSession: () =>
+        set({ userId: null, role: null, onboardingComplete: false }),
       setAuthInitialized: (authInitialized) => set({ authInitialized }),
     }),
     {

@@ -1,13 +1,14 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
-import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { getOAuthRedirectTo } from "@/lib/auth-redirect";
+import {
+  getSupabaseUrlMisconfigurationMessage,
+  isSupabaseConfigured,
+} from "@/lib/is-supabase-configured";
+import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import type { UserRole } from "@/stores/session-store";
 import { useSessionStore } from "@/stores/session-store";
-
-const PENDING_OAUTH_ROLE_KEY = "swipemarket-pending-oauth-role";
 
 function extractOAuthParams(url: string): {
   code?: string;
@@ -36,7 +37,7 @@ function extractOAuthParams(url: string): {
   };
 }
 
-async function establishSessionFromCallbackUrl(callbackUrl: string) {
+export async function establishSessionFromCallbackUrl(callbackUrl: string) {
   const { code, access_token, refresh_token, error, error_description } =
     extractOAuthParams(callbackUrl);
 
@@ -62,22 +63,33 @@ async function establishSessionFromCallbackUrl(callbackUrl: string) {
   throw new Error("Could not complete sign-in (missing authorization code).");
 }
 
-async function applyPendingSignupRole(userId: string) {
-  const pending = await AsyncStorage.getItem(PENDING_OAUTH_ROLE_KEY);
-  await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
+const OAUTH_URL_HINT = /(?:^|[?#])(?:code|access_token|refresh_token|error)=/;
 
-  if (pending !== "supplier" && pending !== "customer") return;
+/**
+ * Completes OAuth when the app is opened on the redirect URL (e.g. `/auth/callback`)
+ * before or alongside `WebBrowser.openAuthSessionAsync`. Safe to call multiple times:
+ * skips if a session already exists, or if the URL has no OAuth payload.
+ */
+export async function completeOAuthSessionFromUrlIfNeeded(
+  url: string | null | undefined,
+): Promise<void> {
+  if (!url || !OAUTH_URL_HINT.test(url)) return;
 
-  await supabase.from("profiles").update({ role: pending }).eq("id", userId);
+  const {
+    data: { session: existing },
+  } = await supabase.auth.getSession();
+  if (existing) return;
+
+  await establishSessionFromCallbackUrl(url);
 }
 
 /**
- * Google OAuth via Supabase. On Sign Up, pass `pendingSignupRole` so the profile role matches the selected card.
+ * Google OAuth via Supabase.
  * Configure Google provider + redirect URLs in Supabase Dashboard (Auth → Providers; URL Configuration).
  */
-export async function signInWithGoogle(options?: {
-  pendingSignupRole?: UserRole;
-}): Promise<{ ok: true; role: UserRole } | { ok: false; reason: "cancelled" | "not_configured" }> {
+export async function signInWithGoogle(): Promise<
+  { ok: true; role: UserRole } | { ok: false; reason: "cancelled" | "not_configured" }
+> {
   if (!isSupabaseConfigured()) {
     Alert.alert(
       "Supabase not configured",
@@ -86,13 +98,16 @@ export async function signInWithGoogle(options?: {
     return { ok: false, reason: "not_configured" };
   }
 
-  if (options?.pendingSignupRole) {
-    await AsyncStorage.setItem(PENDING_OAUTH_ROLE_KEY, options.pendingSignupRole);
-  } else {
-    await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
+  const urlMisconfig = getSupabaseUrlMisconfigurationMessage();
+  if (urlMisconfig) {
+    Alert.alert("Wrong Supabase URL", urlMisconfig);
+    return { ok: false, reason: "not_configured" };
   }
 
-  const redirectTo = Linking.createURL("/auth/callback");
+  const redirectTo = getOAuthRedirectTo();
+  if (__DEV__) {
+    console.info("[auth] Supabase Redirect URLs must include:", redirectTo);
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -103,7 +118,6 @@ export async function signInWithGoogle(options?: {
   });
 
   if (error || !data?.url) {
-    await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
     if (error) Alert.alert("Google sign-in failed", error.message);
     return { ok: false, reason: "cancelled" };
   }
@@ -111,35 +125,29 @@ export async function signInWithGoogle(options?: {
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
   if (result.type !== "success" || !("url" in result) || !result.url) {
-    await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
     return { ok: false, reason: "cancelled" };
   }
 
   try {
-    await establishSessionFromCallbackUrl(result.url);
+    const {
+      data: { session: existing },
+    } = await supabase.auth.getSession();
+    if (!existing) {
+      await establishSessionFromCallbackUrl(result.url);
+    }
   } catch (e) {
-    await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
     Alert.alert("Google sign-in failed", (e as Error).message);
     throw e;
   }
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    await AsyncStorage.removeItem(PENDING_OAUTH_ROLE_KEY);
     Alert.alert("Google sign-in failed", "No session returned.");
     return { ok: false, reason: "cancelled" };
   }
 
-  await applyPendingSignupRole(session.user.id);
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", session.user.id)
-    .maybeSingle();
-
-  const role = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
-  useSessionStore.getState().setSession(session.user.id, role);
+  const { role, onboardingComplete } = await fetchProfileRoleAndOnboarding(session.user.id);
+  useSessionStore.getState().setSession(session.user.id, role, onboardingComplete);
 
   return { ok: true, role };
 }

@@ -1,7 +1,6 @@
 import "../global.css";
 import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { StripeProvider } from "@stripe/stripe-react-native";
 import * as WebBrowser from "expo-web-browser";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -32,6 +31,10 @@ export default function RootLayout() {
   );
 
   if (stripeKey.length > 0) {
+    // Load Stripe only when configured. Static import runs `NativeEventEmitter` setup on iOS and
+    // triggers RN 0.81+ warnings because Stripe's native module lacks addListener/removeListeners.
+    const { StripeProvider } =
+      require("@stripe/stripe-react-native") as typeof import("@stripe/stripe-react-native");
     return <StripeProvider publishableKey={stripeKey}>{tree}</StripeProvider>;
   }
 

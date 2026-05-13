@@ -16,8 +16,11 @@ import { GoogleLogoMark } from "@/components/GoogleLogoMark";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { HREF_ONBOARDING } from "@/lib/routes";
+import { formatSignInError } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { isProfileOnboardingComplete } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore, type UserRole } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -67,7 +70,7 @@ export default function SignInScreen() {
       });
 
       if (error) {
-        Alert.alert("Sign in failed", error.message);
+        Alert.alert("Sign in failed", formatSignInError(error.message));
         return;
       }
 
@@ -82,12 +85,17 @@ export default function SignInScreen() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, onboarding_complete")
         .eq("id", session.user.id)
         .maybeSingle();
 
       const role = (profile?.role === "supplier" ? "supplier" : "customer") as UserRole;
-      setSession(session.user.id, role);
+      const onboardingComplete = isProfileOnboardingComplete(profile?.onboarding_complete);
+      setSession(session.user.id, role, onboardingComplete);
+      if (!onboardingComplete) {
+        router.replace(HREF_ONBOARDING);
+        return;
+      }
       router.replace(role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
     } finally {
       setLoading(false);
@@ -99,8 +107,14 @@ export default function SignInScreen() {
     try {
       const result = await signInWithGoogle();
       if (!result.ok) return;
+      const onboardingComplete = useSessionStore.getState().onboardingComplete;
+      const role = useSessionStore.getState().role ?? result.role;
+      if (!onboardingComplete) {
+        router.replace(HREF_ONBOARDING);
+        return;
+      }
       router.replace(
-        result.role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
+        role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
       );
     } catch {
       /* Alert shown in signInWithGoogle */
