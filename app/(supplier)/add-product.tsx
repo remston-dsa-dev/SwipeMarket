@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -114,19 +115,22 @@ export default function AddProductScreen() {
           }}
         >
           <ThemedText variant="headline">New Product</ThemedText>
-          <PressableScale
-            accessibilityLabel="Cancel"
-            onPress={() => router.back()}
-            style={{
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: theme.radius.sm,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}
-          >
-            <ThemedText variant="caption">Cancel</ThemedText>
-          </PressableScale>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <PressableScale
+              accessibilityLabel="Cancel"
+              onPress={() => router.back()}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: theme.radius.sm,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <ThemedText variant="caption">Cancel</ThemedText>
+            </PressableScale>
+            <HeaderProfileAvatar />
+          </View>
         </View>
 
         <ScrollView

@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { ListingCard } from "@/components/ListingCard";
 import { PressableScale } from "@/components/PressableScale";
 import { QuantitySheet } from "@/components/QuantitySheet";
@@ -325,6 +326,8 @@ export default function SwipeScreen() {
               </View>
             )}
           </PressableScale>
+
+          <HeaderProfileAvatar />
         </View>
       </View>
 

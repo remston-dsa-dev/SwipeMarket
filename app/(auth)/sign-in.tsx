@@ -16,7 +16,6 @@ import { GoogleLogoMark } from "@/components/GoogleLogoMark";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { HREF_ONBOARDING } from "@/lib/routes";
 import { getEmailConfirmationRedirectTo } from "@/lib/auth-redirect";
 import { getLastSignInEmail, setLastSignInEmail } from "@/lib/auth-form-storage";
 import { formatSignInError } from "@/lib/auth-errors";
@@ -98,11 +97,7 @@ export default function SignInScreen() {
         session.user.email?.trim().toLowerCase() || email.trim().toLowerCase();
       await setLastSignInEmail(emailToSave);
       setSession(session.user.id, role, onboardingComplete);
-      if (!onboardingComplete) {
-        router.replace(HREF_ONBOARDING);
-        return;
-      }
-      router.replace(role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe");
+      /* Navigation: (auth)/_layout Redirect sends users to onboarding or main — avoid double replace. */
     } finally {
       setLoading(false);
     }
@@ -143,15 +138,7 @@ export default function SignInScreen() {
       if (session?.user?.email) {
         await setLastSignInEmail(session.user.email.trim().toLowerCase());
       }
-      const onboardingComplete = useSessionStore.getState().onboardingComplete;
-      const role = useSessionStore.getState().role ?? result.role;
-      if (!onboardingComplete) {
-        router.replace(HREF_ONBOARDING);
-        return;
-      }
-      router.replace(
-        role === "supplier" ? "/(supplier)/dashboard" : "/(customer)/swipe",
-      );
+      /* Session + navigation: signInWithGoogle + (auth)/_layout Redirect */
     } catch {
       /* Alert shown in signInWithGoogle */
     } finally {

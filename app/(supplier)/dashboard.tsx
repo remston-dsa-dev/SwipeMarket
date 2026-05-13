@@ -5,6 +5,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Image } from "expo-image";
+import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { ProductRow } from "@/components/ProductRow";
 import { Screen } from "@/components/Screen";
@@ -12,7 +13,6 @@ import { ThemedText } from "@/components/ThemedText";
 import { productToInsertRow } from "@/lib/product-insert";
 import { buildSupplierTemplateCsv, parseSupplierCsvWithReport } from "@/lib/supplier-bulk";
 import { supabase } from "@/lib/supabase";
-import { signOutApp } from "@/lib/sign-out";
 import { useSupplierProducts } from "@/hooks/useSupplierProducts";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -171,21 +171,7 @@ export default function SupplierDashboardScreen() {
           </ThemedText>
         </View>
 
-        <PressableScale
-          accessibilityLabel="Sign out"
-          onPress={() => {
-            void signOutApp().then(() => router.replace("/(auth)/sign-in"));
-          }}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 7,
-            borderRadius: theme.radius.sm,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <ThemedText variant="caption">Sign out</ThemedText>
-        </PressableScale>
+        <HeaderProfileAvatar />
       </View>
 
       <View style={{ gap: 10, marginBottom: 16 }}>

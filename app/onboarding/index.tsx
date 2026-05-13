@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   TextInput,
+  unstable_batchedUpdates,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -39,7 +41,7 @@ export default function OnboardingScreen() {
   const userId = useSessionStore((s) => s.userId);
   const setSession = useSessionStore((s) => s.setSession);
 
-  const [isGoogle, setIsGoogle] = useState(false);
+  const [profileHydrated, setProfileHydrated] = useState(false);
   const [remotePhotoUri, setRemotePhotoUri] = useState<string | null>(null);
   const [emailHint, setEmailHint] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -59,46 +61,66 @@ export default function OnboardingScreen() {
     transform: [{ scale: scaleSell.value }],
   }));
 
-  const loadProfile = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const meta = user.user_metadata as Record<string, unknown>;
-    const google = user.identities?.some((i) => i.provider === "google") ?? false;
-    setIsGoogle(google);
-    setEmailHint(user.email?.split("@")[0] ?? "");
-
-    const display = displayNameFromUserMetadata(meta);
-    const given = typeof meta.given_name === "string" ? meta.given_name : "";
-    const family = typeof meta.family_name === "string" ? meta.family_name : "";
-    if (given || family) {
-      setFirstName(given);
-      setLastName(family);
-    } else if (display) {
-      const parts = display.split(/\s+/);
-      setFirstName(parts[0] ?? "");
-      setLastName(parts.slice(1).join(" ") ?? "");
-    }
-
-    let remote = googlePictureFromMetadata(meta);
-    if (userId) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url")
-        .eq("id", userId)
-        .maybeSingle();
-      if (prof?.full_name && !given && !family && !display) {
-        const p = prof.full_name.split(/\s+/);
-        setFirstName(p[0] ?? "");
-        setLastName(p.slice(1).join(" ") ?? "");
-      }
-      if (!remote && prof?.avatar_url) remote = prof.avatar_url;
-    }
-    setRemotePhotoUri(remote);
-  }, [userId]);
-
   useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+    let cancelled = false;
+    setProfileHydrated(false);
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
+        unstable_batchedUpdates(() => {
+          setProfileHydrated(true);
+        });
+        return;
+      }
+
+      const meta = user.user_metadata as Record<string, unknown>;
+      const email = user.email?.split("@")[0] ?? "";
+
+      const display = displayNameFromUserMetadata(meta);
+      const given = typeof meta.given_name === "string" ? meta.given_name : "";
+      const family = typeof meta.family_name === "string" ? meta.family_name : "";
+
+      let nextFirst = "";
+      let nextLast = "";
+      if (given || family) {
+        nextFirst = given;
+        nextLast = family;
+      } else if (display) {
+        const parts = display.split(/\s+/);
+        nextFirst = parts[0] ?? "";
+        nextLast = parts.slice(1).join(" ") ?? "";
+      }
+
+      let remote = googlePictureFromMetadata(meta);
+      if (userId) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", userId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (prof?.full_name && !given && !family && !display) {
+          const p = prof.full_name.split(/\s+/);
+          nextFirst = p[0] ?? "";
+          nextLast = p.slice(1).join(" ") ?? "";
+        }
+        if (!remote && prof?.avatar_url) remote = prof.avatar_url;
+      }
+
+      if (cancelled) return;
+      unstable_batchedUpdates(() => {
+        setEmailHint(email);
+        setFirstName(nextFirst);
+        setLastName(nextLast);
+        setRemotePhotoUri(remote);
+        setProfileHydrated(true);
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const avatarLabel = useMemo(() => {
     const n = `${firstName} ${lastName}`.trim();
@@ -135,8 +157,24 @@ export default function OnboardingScreen() {
     scaleSell.value = withSpring(next === "supplier" ? 1.03 : 1, { damping: 14, stiffness: 180 });
   }
 
+  function openAvatarMenu() {
+    const hasImage = Boolean(avatarImageUri);
+    if (hasImage) {
+      confirmSignOut();
+      return;
+    }
+    Alert.alert(
+      "Profile",
+      "Add a profile photo or sign out if you need a different account.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Add photo", onPress: () => void pickAvatar() },
+        { text: "Sign out", style: "destructive", onPress: confirmSignOut },
+      ],
+    );
+  }
+
   async function pickAvatar() {
-    if (isGoogle) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert("Photos", "Allow photo access to set your profile picture.");
@@ -157,7 +195,7 @@ export default function OnboardingScreen() {
       Alert.alert("Choose your role", "Pick shopper or partner to continue.");
       return;
     }
-    if (!isGoogle && (!firstName.trim() || !lastName.trim())) {
+    if (!firstName.trim() || !lastName.trim()) {
       Alert.alert("Your name", "Enter your first and last name so we can personalize your profile.");
       return;
     }
@@ -254,6 +292,16 @@ export default function OnboardingScreen() {
     }
   }
 
+  if (!profileHydrated) {
+    return (
+      <Screen style={{ paddingHorizontal: 0 }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
       <KeyboardAvoidingView
@@ -267,21 +315,15 @@ export default function OnboardingScreen() {
         >
           <View style={styles.topBar}>
             <View style={{ flex: 1 }} />
-            {userId ? (
-              <PressableScale
-                accessibilityLabel="Sign out"
-                onPress={confirmSignOut}
-                style={{ paddingVertical: 8, paddingHorizontal: 4, marginRight: 4 }}
-              >
-                <Ionicons name="log-out-outline" size={26} color={theme.colors.textSecondary} />
-              </PressableScale>
-            ) : null}
             <UserAvatar
               imageUri={avatarImageUri}
               displayName={avatarLabel}
               size={48}
-              editable={!isGoogle}
-              onPress={isGoogle ? undefined : pickAvatar}
+              editable
+              accessibilityLabel={
+                avatarImageUri ? "Profile: sign out" : "Profile: add photo or sign out"
+              }
+              onPress={openAvatarMenu}
               loading={uploadBusy}
             />
           </View>
@@ -293,32 +335,30 @@ export default function OnboardingScreen() {
             </ThemedText>
           </View>
 
-          {!isGoogle ? (
-            <View style={[styles.nameRow, { paddingHorizontal: 20 }]}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <ThemedText variant="caption" color="muted">First name</ThemedText>
-                <TextInput
-                  value={firstName}
-                  onChangeText={setFirstName}
-                  placeholder="Alex"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  autoCapitalize="words"
-                  style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
-                />
-              </View>
-              <View style={{ flex: 1, gap: 6 }}>
-                <ThemedText variant="caption" color="muted">Last name</ThemedText>
-                <TextInput
-                  value={lastName}
-                  onChangeText={setLastName}
-                  placeholder="Rivera"
-                  placeholderTextColor={theme.colors.textSecondary}
-                  autoCapitalize="words"
-                  style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
-                />
-              </View>
+          <View style={[styles.nameRow, { paddingHorizontal: 20 }]}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <ThemedText variant="caption" color="muted">First name</ThemedText>
+              <TextInput
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Alex"
+                placeholderTextColor={theme.colors.textSecondary}
+                autoCapitalize="words"
+                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
+              />
             </View>
-          ) : null}
+            <View style={{ flex: 1, gap: 6 }}>
+              <ThemedText variant="caption" color="muted">Last name</ThemedText>
+              <TextInput
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Rivera"
+                placeholderTextColor={theme.colors.textSecondary}
+                autoCapitalize="words"
+                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
+              />
+            </View>
+          </View>
 
           <View style={{ paddingHorizontal: 20, marginTop: 28, gap: 10 }}>
             <ThemedText variant="label">Shopper or partner?</ThemedText>
@@ -411,11 +451,11 @@ export default function OnboardingScreen() {
                 {submitting ? "Saving…" : "Continue"}
               </ThemedText>
             </PressableScale>
-            {!isGoogle ? (
-              <ThemedText variant="caption" color="muted" style={{ textAlign: "center", marginTop: 12 }}>
-                {"Tap your photo above to upload a profile image, or we'll use your initials."}
-              </ThemedText>
-            ) : null}
+            <ThemedText variant="caption" color="muted" style={{ textAlign: "center", marginTop: 12 }}>
+              {avatarImageUri
+                ? "Tap your profile picture to sign out. We pre-fill your name when we can; edit it if needed."
+                : "Tap your profile picture to add a photo or sign out. We pre-fill your name when we can; edit it if needed."}
+            </ThemedText>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -1,6 +1,7 @@
 import { Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { CartItemRow } from "@/components/CartItemRow";
+import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -91,6 +92,8 @@ export default function CartScreen() {
           >
             <ThemedText variant="caption">← Back</ThemedText>
           </PressableScale>
+
+          <HeaderProfileAvatar />
         </View>
       </View>
 

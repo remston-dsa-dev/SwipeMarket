@@ -7,10 +7,12 @@ type Props = {
   imageUri: string | null;
   displayName: string;
   size?: number;
-  /** When true, tapping opens picker / callback. Google-only mode can set false. */
+  /** When true, tapping runs `onPress` (e.g. menu or picker). */
   editable?: boolean;
   onPress?: () => void;
   loading?: boolean;
+  /** Used when `editable` and `onPress` are set (e.g. VoiceOver). */
+  accessibilityLabel?: string;
 };
 
 export function UserAvatar({
@@ -20,6 +22,7 @@ export function UserAvatar({
   editable = false,
   onPress,
   loading = false,
+  accessibilityLabel: pressableAccessibilityLabel,
 }: Props) {
   const theme = useTheme();
   const initials = initialsFromDisplayName(displayName || "?");
@@ -64,7 +67,11 @@ export function UserAvatar({
 
   if (editable && onPress) {
     return (
-      <Pressable onPress={onPress} accessibilityLabel="Change profile photo" hitSlop={8}>
+      <Pressable
+        onPress={onPress}
+        accessibilityLabel={pressableAccessibilityLabel ?? "Open profile options"}
+        hitSlop={8}
+      >
         {inner}
       </Pressable>
     );
