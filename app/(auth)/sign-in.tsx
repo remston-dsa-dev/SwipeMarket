@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,7 +23,12 @@ import { getLastSignInEmail, setLastSignInEmail } from "@/lib/auth-form-storage"
 import { formatSignInError } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import {
+  getPendingVerification,
+  hasEmailBeenCelebrated,
+} from "@/lib/pending-verification";
 import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
+import { STATUS_SUCCESS } from "@/lib/status-colors";
 import { supabase } from "@/lib/supabase";
 import { emailScore, validateEmail } from "@/lib/validation";
 import { useSessionStore } from "@/stores/session-store";
@@ -41,17 +46,60 @@ export default function SignInScreen() {
   const [emailFocused,  setEmailFocused]  = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  /* Email that has just been celebrated on the welcome screen. Used to show
+     a friendly "Email verified — sign in to continue" banner once the user
+     lands here from the post-confirmation flow. */
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  /* Pre-render gate: while we look up whether the user still has an
+     un-celebrated pending verification, render nothing. If the lookup says
+     they do, we redirect to /auth/welcome so the celebration always plays
+     BEFORE the sign-in form. Otherwise we show the form. The async lookup
+     finishes in a few ms, so the user never perceives a flash. */
+  const [gate, setGate] = useState<"resolving" | "welcome" | "show">(
+    "resolving",
+  );
 
   useEffect(() => {
     void (async () => {
-      const saved = await getLastSignInEmail();
+      const [saved, pending] = await Promise.all([
+        getLastSignInEmail(),
+        getPendingVerification(),
+      ]);
       if (saved) setEmail(saved);
+
+      /* Has the welcome screen already played for this email? */
+      const candidate = (saved ?? pending?.email ?? "").trim().toLowerCase();
+      const celebrated =
+        !!candidate && (await hasEmailBeenCelebrated(candidate));
+
+      /* Outstanding pending verification (recent sign-up that hasn't passed
+         through welcome yet). We require the flag to be reasonably recent
+         (< 30 min) so a stale flag from a much earlier session doesn't keep
+         pulling users into welcome whenever they open sign-in. */
+      const PENDING_FRESH_MS = 30 * 60 * 1000;
+      const pendingFresh =
+        !!pending &&
+        Number.isFinite(pending.ts) &&
+        Date.now() - pending.ts < PENDING_FRESH_MS;
+
+      if (pendingFresh && !celebrated) {
+        setGate("welcome");
+        return;
+      }
+
+      if (celebrated) setPendingEmail(candidate);
+      setGate("show");
     })();
   }, []);
 
+  /* Must run before any early return — hooks order must be stable across
+     gate transitions (resolving → welcome → show). */
   const emailValid    = useMemo(() => validateEmail(email) === null, [email]);
   const emailProgress = useMemo(() => emailScore(email), [email]);
   const formValid     = emailValid && password.length > 0;
+
+  if (gate === "resolving") return null;
+  if (gate === "welcome") return <Redirect href="/auth/welcome" />;
 
   function clearFieldError(field: keyof typeof errors) {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
@@ -151,6 +199,12 @@ export default function SignInScreen() {
   const ctaDisabled = loading || !formValid;
   /* Show the green check only after the user leaves the email field. */
   const showEmailValid = emailValid && email.length > 0 && !emailFocused;
+  /* Show the "Email verified" banner only while the prefilled email still
+     matches the pending verification — once the user edits the field to a
+     different address the banner stops applying. */
+  const showVerifiedBanner =
+    !!pendingEmail &&
+    email.trim().toLowerCase() === pendingEmail;
 
   return (
     <SafeAreaView
@@ -187,11 +241,50 @@ export default function SignInScreen() {
           </View>
 
           <View style={[styles.headingWrap, compact && styles.headingWrapCompact]}>
-            <ThemedText variant="title">Welcome back</ThemedText>
+            <ThemedText variant="title">
+              {showVerifiedBanner ? "Email verified" : "Welcome back"}
+            </ThemedText>
             <ThemedText variant="caption" color="muted">
-              Sign in to continue swiping.
+              {showVerifiedBanner
+                ? "Sign in once more to finish setting up your account."
+                : "Sign in to continue swiping."}
             </ThemedText>
           </View>
+
+          {showVerifiedBanner ? (
+            <View
+              style={[
+                styles.verifiedBanner,
+                {
+                  backgroundColor:
+                    theme.scheme === "dark"
+                      ? "rgba(5,150,105,0.16)"
+                      : "rgba(5,150,105,0.10)",
+                  borderColor:
+                    theme.scheme === "dark"
+                      ? "rgba(5,150,105,0.45)"
+                      : "rgba(5,150,105,0.35)",
+                },
+              ]}
+            >
+              <View style={[styles.verifiedBadge, { backgroundColor: STATUS_SUCCESS }]}>
+                <Ionicons name="checkmark-sharp" size={12} color="#FFFFFF" />
+              </View>
+              <ThemedText
+                variant="caption"
+                style={{ color: theme.colors.textPrimary, flex: 1 }}
+              >
+                Your email{" "}
+                <ThemedText
+                  variant="caption"
+                  style={{ fontWeight: "700", color: theme.colors.textPrimary }}
+                >
+                  {pendingEmail}
+                </ThemedText>
+                {" "}is confirmed. Enter your password to continue.
+              </ThemedText>
+            </View>
+          ) : null}
 
           <View style={[styles.fields, compact && styles.fieldsCompact]}>
             <AuthInput
@@ -333,6 +426,23 @@ const styles = StyleSheet.create({
   headingWrapCompact: { marginBottom: 16 },
   fields:         { gap: 14, marginBottom: 24 },
   fieldsCompact:  { gap: 10, marginBottom: 16 },
+  verifiedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  verifiedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   forgotBtn: { alignSelf: "flex-end", paddingHorizontal: 4, marginTop: 2 },
   ctaShadow: {
     borderRadius: 999,

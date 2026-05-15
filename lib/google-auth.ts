@@ -89,32 +89,84 @@ const AUTH_DEEP_LINK_HINT =
   /(?:^|[?#])(?:code|access_token|refresh_token|token_hash|error)=/;
 
 /**
+ * Supabase responds with these messages when a verification / OAuth link has
+ * already been redeemed or has aged out. They're expected during dev hot
+ * reloads (where the same initial URL keeps replaying) and on legitimate
+ * second-click scenarios. We surface them as a recoverable `{ ok: false }`
+ * rather than throwing so callers can render a friendly UX.
+ */
+const CONSUMED_LINK_PATTERNS = [
+  "email link is invalid",
+  "email link has expired",
+  "invalid or has expired",
+  "otp_expired",
+  "access_denied",
+  "code verifier",
+  "pkce",
+];
+
+function isConsumedOrExpiredLinkError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return CONSUMED_LINK_PATTERNS.some((p) => lower.includes(p));
+}
+
+export type CompleteSessionResult =
+  | { ok: true; skipped?: "no_payload" | "already_signed_in" }
+  | { ok: false; reason: "consumed_or_expired" | "error"; message: string };
+
+/**
  * Completes OAuth when the app is opened on the redirect URL (e.g. `/auth/callback`)
- * before or alongside `WebBrowser.openAuthSessionAsync`. Safe to call multiple times:
- * skips if a session already exists, or if the URL has no OAuth payload.
+ * before or alongside `WebBrowser.openAuthSessionAsync`. Safe to call multiple
+ * times — it short-circuits when there's no auth payload, when a session
+ * already exists, or when the link has already been consumed/expired (a
+ * common case in dev where the initial URL replays on every Metro reload).
  */
 export async function completeOAuthSessionFromUrlIfNeeded(
   url: string | null | undefined,
-): Promise<void> {
-  if (!url || !AUTH_DEEP_LINK_HINT.test(url)) return;
+): Promise<CompleteSessionResult> {
+  if (!url || !AUTH_DEEP_LINK_HINT.test(url)) {
+    return { ok: true, skipped: "no_payload" };
+  }
 
   const {
     data: { session: existing },
   } = await supabase.auth.getSession();
-  if (existing) return;
+  if (existing) return { ok: true, skipped: "already_signed_in" };
 
-  await establishSessionFromCallbackUrl(url);
+  try {
+    await establishSessionFromCallbackUrl(url);
+    return { ok: true };
+  } catch (e) {
+    const message = (e as Error).message ?? "Unknown error";
+    if (isConsumedOrExpiredLinkError(message)) {
+      return { ok: false, reason: "consumed_or_expired", message };
+    }
+    return { ok: false, reason: "error", message };
+  }
 }
 
 export function urlLooksLikeAuthRedirect(url: string | null | undefined): boolean {
   return !!url && AUTH_DEEP_LINK_HINT.test(url);
 }
 
-/** Runs {@link completeOAuthSessionFromUrlIfNeeded} for each unique URL (e.g. callback + initial link). */
-export async function completeOAuthSessionFromUrlList(urls: string[]): Promise<void> {
+/**
+ * Runs {@link completeOAuthSessionFromUrlIfNeeded} for each unique URL (e.g.
+ * callback + initial link). Returns the first non-skipped outcome so callers
+ * can decide whether to celebrate, retry, or surface an error.
+ */
+export async function completeOAuthSessionFromUrlList(
+  urls: string[],
+): Promise<CompleteSessionResult> {
+  let lastSkip: CompleteSessionResult = { ok: true, skipped: "no_payload" };
   for (const u of urls) {
-    await completeOAuthSessionFromUrlIfNeeded(u);
+    const res = await completeOAuthSessionFromUrlIfNeeded(u);
+    /* Successful exchange or an actual failure → stop looking. We only keep
+       iterating while everything is being skipped (no payload / already
+       signed in). */
+    if (!res.ok || (res.ok && !res.skipped)) return res;
+    lastSkip = res;
   }
+  return lastSkip;
 }
 
 /**

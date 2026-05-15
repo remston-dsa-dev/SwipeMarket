@@ -20,11 +20,13 @@ import { Logo } from "@/components/Logo";
 import { PasswordRulesSheet } from "@/components/PasswordRulesSheet";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { VerifyEmailSheet } from "@/components/VerifyEmailSheet";
 import { getEmailConfirmationRedirectTo } from "@/lib/auth-redirect";
 import { setLastSignInEmail } from "@/lib/auth-form-storage";
 import { formatSignUpError, isSignUpEmailAlreadyRegistered } from "@/lib/auth-errors";
 import { signInWithGoogle } from "@/lib/google-auth";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { setPendingVerification } from "@/lib/pending-verification";
 import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import {
@@ -54,6 +56,8 @@ export default function SignUpScreen() {
   }>({});
   const [emailFocused,    setEmailFocused]    = useState(false);
   const [rulesOpen,       setRulesOpen]       = useState(false);
+  const [verifyOpen,      setVerifyOpen]      = useState(false);
+  const [pendingEmail,    setPendingEmail]    = useState("");
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -135,12 +139,14 @@ export default function SignUpScreen() {
       }
 
       if (!data.session) {
-        await setLastSignInEmail(email.trim().toLowerCase());
-        Alert.alert(
-          "Confirm your email",
-          "We sent a confirmation link to your inbox. Open it on this device to verify your account, then sign in here.\n\nIn Supabase: Authentication → Providers → Email → enable Confirm email.",
-        );
-        router.replace("/(auth)/sign-in");
+        const normalized = email.trim().toLowerCase();
+        await setLastSignInEmail(normalized);
+        /* Persist the pending verification so the callback screen knows to
+           route the user to the welcome/confetti screen instead of dropping
+           them silently on the home redirect. */
+        await setPendingVerification(normalized);
+        setPendingEmail(normalized);
+        setVerifyOpen(true);
         return;
       }
 
@@ -367,6 +373,28 @@ export default function SignUpScreen() {
         visible={rulesOpen}
         password={password}
         onClose={() => setRulesOpen(false)}
+      />
+
+      <VerifyEmailSheet
+        visible={verifyOpen}
+        email={pendingEmail}
+        onClose={() => {
+          /* Explicit "I'll do it later" / backdrop dismiss: the user is
+             telling us they haven't verified yet. Park them on sign-in
+             rather than celebrating prematurely. */
+          setVerifyOpen(false);
+          router.replace("/(auth)/sign-in");
+        }}
+        onReturnFromEmail={() => {
+          /* The user just came back from their mail app, so we treat the
+             verification as having (likely) just happened. Route through
+             the welcome celebration screen — which then forwards them to
+             sign-in for the explicit final step. Deterministic flow:
+             confirm → welcome → sign-in regardless of whether the deep
+             link auto-established a session. */
+          setVerifyOpen(false);
+          router.replace("/auth/welcome");
+        }}
       />
     </SafeAreaView>
   );

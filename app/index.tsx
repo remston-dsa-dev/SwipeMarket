@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
+import { useShouldCelebrate } from "@/hooks/useShouldCelebrate";
 import { HREF_ONBOARDING } from "@/lib/routes";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -25,6 +26,7 @@ export default function Index() {
   const role                 = useSessionStore((s) => s.role);
   const onboardingComplete   = useSessionStore((s) => s.onboardingComplete);
   const authInitialized      = useSessionStore((s) => s.authInitialized);
+  const celebrate            = useShouldCelebrate();
 
   if (!authInitialized) {
     return (
@@ -35,6 +37,17 @@ export default function Index() {
   }
 
   if (userId) {
+    /* Wait for the celebration check to resolve before redirecting; otherwise
+       we'd flash the onboarding/dashboard screen briefly before bouncing to
+       /auth/welcome. */
+    if (celebrate === null) {
+      return (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0C0520" }}>
+          <ActivityIndicator size="large" color="#A855F7" />
+        </View>
+      );
+    }
+    if (celebrate) return <Redirect href="/auth/welcome" />;
     if (!onboardingComplete) {
       return <Redirect href={HREF_ONBOARDING} />;
     }
