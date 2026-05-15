@@ -12,12 +12,9 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -29,6 +26,7 @@ import {
 import { fetchProfileRoleAndOnboarding } from "@/lib/profile-onboarding";
 import { signOutApp } from "@/lib/sign-out";
 import { supabase } from "@/lib/supabase";
+import { STATUS_SUCCESS } from "@/lib/status-colors";
 import { uploadAvatarToStorage } from "@/lib/upload-avatar";
 import { useSessionStore, type UserRole } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -50,16 +48,6 @@ export default function OnboardingScreen() {
   const [choice, setChoice] = useState<Choice | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
-
-  const scaleShop = useSharedValue(1);
-  const scaleSell = useSharedValue(1);
-
-  const shopStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scaleShop.value }],
-  }));
-  const sellStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scaleSell.value }],
-  }));
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +119,13 @@ export default function OnboardingScreen() {
 
   const avatarImageUri = pickedImageUri ?? remotePhotoUri;
 
+  const formReady =
+    Boolean(choice) &&
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0;
+
+  const ctaDisabled = !formReady || submitting;
+
   function confirmSignOut() {
     Alert.alert(
       "Sign out?",
@@ -149,12 +144,6 @@ export default function OnboardingScreen() {
         },
       ],
     );
-  }
-
-  function setChoiceAnimated(next: Choice) {
-    setChoice(next);
-    scaleShop.value = withSpring(next === "customer" ? 1.03 : 1, { damping: 14, stiffness: 180 });
-    scaleSell.value = withSpring(next === "supplier" ? 1.03 : 1, { damping: 14, stiffness: 180 });
   }
 
   function openAvatarMenu() {
@@ -313,26 +302,63 @@ export default function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.topBar}>
-            <View style={{ flex: 1 }} />
-            <UserAvatar
-              imageUri={avatarImageUri}
-              displayName={avatarLabel}
-              size={48}
-              editable
-              accessibilityLabel={
-                avatarImageUri ? "Profile: sign out" : "Profile: add photo or sign out"
-              }
-              onPress={openAvatarMenu}
-              loading={uploadBusy}
-            />
+          <View style={styles.welcomeRow}>
+            <View style={styles.welcomeMain}>
+              <View style={styles.titleWithLogo}>
+                <View style={styles.welcomeLogo}>
+                  <Logo
+                    size="sm"
+                    showWordmark={false}
+                    lightBackground={theme.scheme === "light"}
+                  />
+                </View>
+                <ThemedText
+                  variant="title"
+                  style={styles.heroTitle}
+                  numberOfLines={2}
+                >
+                  Welcome to SwipeMarket
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.avatarWrap}>
+              <UserAvatar
+                imageUri={avatarImageUri}
+                displayName={avatarLabel}
+                size={48}
+                editable
+                accessibilityLabel={
+                  avatarImageUri ? "Profile: sign out" : "Profile: add photo or sign out"
+                }
+                onPress={openAvatarMenu}
+                loading={uploadBusy}
+              />
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.activeDot,
+                  {
+                    backgroundColor: STATUS_SUCCESS,
+                    borderColor: theme.colors.background,
+                  },
+                ]}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+            </View>
           </View>
 
-          <View style={{ paddingHorizontal: 20, gap: 8 }}>
-            <ThemedText variant="title">Welcome to SwipeMarket</ThemedText>
-            <ThemedText variant="body" color="muted">
+          <View style={styles.welcomeFollow}>
+            <ThemedText variant="caption" color="muted" style={styles.heroSubtitle}>
               A quick stop so we can tailor the app to you. You can change this later in settings.
             </ThemedText>
+            <View
+              style={[
+                styles.heroRule,
+                { backgroundColor: theme.colors.border },
+              ]}
+            />
           </View>
 
           <View style={[styles.nameRow, { paddingHorizontal: 20 }]}>
@@ -344,7 +370,15 @@ export default function OnboardingScreen() {
                 placeholder="Alex"
                 placeholderTextColor={theme.colors.textSecondary}
                 autoCapitalize="words"
-                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: theme.colors.border,
+                    color: theme.colors.textPrimary,
+                    borderRadius: theme.radius.md,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
               />
             </View>
             <View style={{ flex: 1, gap: 6 }}>
@@ -355,34 +389,49 @@ export default function OnboardingScreen() {
                 placeholder="Rivera"
                 placeholderTextColor={theme.colors.textSecondary}
                 autoCapitalize="words"
-                style={[styles.input, { borderColor: theme.colors.border, color: theme.colors.textPrimary }]}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: theme.colors.border,
+                    color: theme.colors.textPrimary,
+                    borderRadius: theme.radius.md,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
               />
             </View>
           </View>
 
-          <View style={{ paddingHorizontal: 20, marginTop: 28, gap: 10 }}>
-            <ThemedText variant="label">Shopper or partner?</ThemedText>
+          <View style={{ paddingHorizontal: 20, marginTop: 28, gap: 6 }}>
+            <ThemedText variant="label" style={styles.sectionLabel}>
+              Shopper or partner?
+            </ThemedText>
             <ThemedText variant="caption" color="muted">
               Your choice is saved to your profile and used when you sign in.
             </ThemedText>
           </View>
 
           <View style={[styles.cards, { paddingHorizontal: 20 }]}>
-            <Animated.View style={shopStyle}>
-              <PressableScale
-                accessibilityLabel="I am a shopper"
-                onPress={() => setChoiceAnimated("customer")}
-                style={[
+            <PressableScale
+              accessibilityLabel="I am a shopper"
+              scaleOnPress={false}
+              onPress={() => setChoice("customer")}
+              style={[
                   styles.card,
                   {
                     borderColor: choice === "customer" ? theme.colors.primary : theme.colors.border,
-                    borderWidth: choice === "customer" ? 2.5 : 1,
+                    borderWidth: choice === "customer" ? 2 : 1,
                     backgroundColor:
                       choice === "customer"
                         ? theme.scheme === "light"
-                          ? "rgba(124,58,237,0.08)"
-                          : "rgba(124,58,237,0.18)"
+                          ? "rgba(124,58,237,0.06)"
+                          : "rgba(124,58,237,0.14)"
                         : theme.colors.surface,
+                    shadowColor: theme.scheme === "light" ? "#0F172A" : "#000",
+                    shadowOpacity: theme.scheme === "light" ? 0.06 : 0.25,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: choice === "customer" ? 4 : 2,
                   },
                 ]}
               >
@@ -399,23 +448,27 @@ export default function OnboardingScreen() {
                   <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
                 ) : null}
               </PressableScale>
-            </Animated.View>
 
-            <Animated.View style={sellStyle}>
-              <PressableScale
-                accessibilityLabel="I am a partner seller"
-                onPress={() => setChoiceAnimated("supplier")}
-                style={[
+            <PressableScale
+              accessibilityLabel="I am a partner seller"
+              scaleOnPress={false}
+              onPress={() => setChoice("supplier")}
+              style={[
                   styles.card,
                   {
                     borderColor: choice === "supplier" ? theme.colors.secondary : theme.colors.border,
-                    borderWidth: choice === "supplier" ? 2.5 : 1,
+                    borderWidth: choice === "supplier" ? 2 : 1,
                     backgroundColor:
                       choice === "supplier"
                         ? theme.scheme === "light"
-                          ? "rgba(236,72,153,0.08)"
-                          : "rgba(236,72,153,0.16)"
+                          ? "rgba(236,72,153,0.06)"
+                          : "rgba(236,72,153,0.14)"
                         : theme.colors.surface,
+                    shadowColor: theme.scheme === "light" ? "#0F172A" : "#000",
+                    shadowOpacity: theme.scheme === "light" ? 0.06 : 0.25,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: choice === "supplier" ? 4 : 2,
                   },
                 ]}
               >
@@ -425,33 +478,58 @@ export default function OnboardingScreen() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <ThemedText variant="headline">Partner</ThemedText>
                   <ThemedText variant="caption" color="muted">
-                    List products, manage inventory, and grow with SwipeMarket shoppers.
+                    List products, manage inventory, and grow with shoppers.
                   </ThemedText>
                 </View>
                 {choice === "supplier" ? (
                   <Ionicons name="checkmark-circle" size={24} color={theme.colors.secondary} />
                 ) : null}
               </PressableScale>
-            </Animated.View>
           </View>
 
           <View style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 32 }}>
             <PressableScale
               accessibilityLabel="Continue"
+              accessibilityState={{ disabled: ctaDisabled }}
               onPress={handleContinue}
-              style={{
-                borderRadius: theme.radius.pill,
-                paddingVertical: 18,
-                alignItems: "center",
-                backgroundColor:
-                  !choice || submitting ? theme.colors.border : theme.colors.primary,
-              }}
+              disabled={ctaDisabled}
+              style={styles.ctaShadow}
             >
-              <ThemedText variant="label" color="onPrimary">
-                {submitting ? "Saving…" : "Continue"}
-              </ThemedText>
+              {formReady ? (
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.secondary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    borderRadius: theme.radius.pill,
+                    paddingVertical: 18,
+                    alignItems: "center",
+                    opacity: submitting ? 0.85 : 1,
+                  }}
+                >
+                  <ThemedText variant="label" color="onPrimary">
+                    {submitting ? "Saving…" : "Continue"}
+                  </ThemedText>
+                </LinearGradient>
+              ) : (
+                <View
+                  style={{
+                    borderRadius: theme.radius.pill,
+                    paddingVertical: 18,
+                    alignItems: "center",
+                    backgroundColor: theme.colors.border,
+                  }}
+                >
+                  <ThemedText
+                    variant="label"
+                    style={{ color: theme.colors.textSecondary }}
+                  >
+                    Continue
+                  </ThemedText>
+                </View>
+              )}
             </PressableScale>
-            <ThemedText variant="caption" color="muted" style={{ textAlign: "center", marginTop: 12 }}>
+            <ThemedText variant="caption" color="muted" style={{ textAlign: "center", marginTop: 14, lineHeight: 20 }}>
               {avatarImageUri
                 ? "Tap your profile picture to sign out. We pre-fill your name when we can; edit it if needed."
                 : "Tap your profile picture to add a photo or sign out. We pre-fill your name when we can; edit it if needed."}
@@ -465,22 +543,79 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 24 },
-  topBar: {
+  welcomeRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  nameRow: { flexDirection: "row", gap: 12, marginTop: 20 },
+  welcomeMain: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  titleWithLogo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 0,
+  },
+  welcomeLogo: {
+    flexShrink: 0,
+  },
+  welcomeFollow: {
+    paddingHorizontal: 20,
+    gap: 10,
+    paddingBottom: 4,
+  },
+  avatarWrap: {
+    position: "relative",
+    flexShrink: 0,
+  },
+  activeDot: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+  },
+  heroTitle: {
+    letterSpacing: -0.35,
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  heroSubtitle: {
+    lineHeight: 22,
+  },
+  heroRule: {
+    height: 1,
+    alignSelf: "stretch",
+    opacity: 0.85,
+  },
+  sectionLabel: {
+    letterSpacing: 0.15,
+  },
+  ctaShadow: {
+    borderRadius: 999,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  nameRow: { flexDirection: "row", gap: 12, marginTop: 14 },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     fontSize: 16,
   },
-  cards: { gap: 16, marginTop: 8 },
+  cards: { gap: 14, marginTop: 8 },
   card: {
     flexDirection: "row",
     alignItems: "center",

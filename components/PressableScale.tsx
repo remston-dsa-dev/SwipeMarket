@@ -19,6 +19,12 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   accessibilityState?: AccessibilityState;
+  disabled?: boolean;
+  /**
+   * When false, skips the press shrink — use on surfaces with lots of text
+   * so iOS/Android don’t rasterize labels at fractional scales (looks blurry).
+   */
+  scaleOnPress?: boolean;
 };
 
 export function PressableScale({
@@ -27,6 +33,8 @@ export function PressableScale({
   style,
   accessibilityLabel,
   accessibilityState,
+  disabled = false,
+  scaleOnPress = true,
 }: Props) {
   const scale = useSharedValue(1);
 
@@ -39,11 +47,14 @@ export function PressableScale({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={accessibilityState}
+      disabled={disabled}
       onPress={onPress}
       onPressIn={() => {
+        if (disabled || !scaleOnPress) return;
         scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
       }}
       onPressOut={() => {
+        if (disabled || !scaleOnPress) return;
         scale.value = withSpring(1, { damping: 15, stiffness: 400 });
       }}
       style={[animatedStyle, style]}

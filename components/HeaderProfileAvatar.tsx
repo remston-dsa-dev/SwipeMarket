@@ -14,12 +14,18 @@ import { useSessionStore } from "@/stores/session-store";
 type Props = {
   /** Avatar diameter (default 40). */
   size?: number;
+  /**
+   * When set, tapping the avatar runs this instead of the sign-out flow
+   * (e.g. open the shopper hub menu from `CustomerHeaderActions`).
+   */
+  onAvatarPress?: () => void;
 };
 
 /**
- * Profile photo + initials in the header; tap confirms sign-out (same pattern as Inventory’s old control).
+ * Profile photo + initials in the header. By default tap confirms sign-out;
+ * pass `onAvatarPress` to delegate the tap (e.g. open an account menu).
  */
-export function HeaderProfileAvatar({ size = 40 }: Props) {
+export function HeaderProfileAvatar({ size = 40, onAvatarPress }: Props) {
   const router = useRouter();
   const userId = useSessionStore((s) => s.userId);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -87,8 +93,8 @@ export function HeaderProfileAvatar({ size = 40 }: Props) {
       displayName={label || "Member"}
       size={size}
       editable
-      accessibilityLabel="Account: sign out"
-      onPress={confirmSignOut}
+      accessibilityLabel={onAvatarPress ? "Open account menu" : "Account: sign out"}
+      onPress={onAvatarPress ?? confirmSignOut}
     />
   );
 }

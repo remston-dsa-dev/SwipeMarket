@@ -1,15 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, View } from "react-native";
 import { useRouter, useSegments } from "expo-router";
 import type { Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { signOutApp } from "@/lib/sign-out";
+import { STATUS_ERROR, STATUS_SUCCESS } from "@/lib/status-colors";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   avatarSize?: number;
+  /**
+   * From Discover: opens the filter sheet. On other tabs, omit to navigate to
+   * Discover when the user picks "Tune discover filters" from the menu.
+   */
+  onOpenDiscoverFilters?: () => void;
 };
 
 type MenuKey = "discover" | "cart" | "orders" | "more";
@@ -55,8 +62,11 @@ const SHOPPER_MENU: MenuItem[] = [
   },
 ];
 
-/** Hamburger opens shopper hub menu; avatar is sign out. */
-export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
+/** Avatar opens hub menu (nav, discover filters, sign out). Green badge = signed in. */
+export function CustomerHeaderActions({
+  avatarSize = 40,
+  onOpenDiscoverFilters,
+}: Props) {
   const router = useRouter();
   const theme = useTheme();
   const segments = useSegments();
@@ -84,16 +94,58 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
     [activeKey, router],
   );
 
+  function openFiltersFromMenu() {
+    setMenuOpen(false);
+    if (onOpenDiscoverFilters) {
+      onOpenDiscoverFilters();
+      return;
+    }
+    router.push("/(customer)/swipe");
+  }
+
+  function confirmSignOutFromMenu() {
+    setMenuOpen(false);
+    Alert.alert(
+      "Sign out?",
+      "You will need to sign in again to use SwipeMarket.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: () => {
+            void signOutApp().then(() => router.replace("/(auth)/sign-in"));
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-      <PressableScale
-        accessibilityLabel="Shopper menu"
-        onPress={() => setMenuOpen(true)}
-        style={{ paddingVertical: 8, paddingHorizontal: 6 }}
+      <View
+        style={[
+          styles.avatarWrap,
+          { width: avatarSize, height: avatarSize },
+        ]}
       >
-        <Ionicons name="menu" size={28} color={theme.colors.textSecondary} />
-      </PressableScale>
-      <HeaderProfileAvatar size={avatarSize} />
+        <HeaderProfileAvatar
+          size={avatarSize}
+          onAvatarPress={() => setMenuOpen(true)}
+        />
+        <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          style={[
+            styles.activeDot,
+            {
+              backgroundColor: STATUS_SUCCESS,
+              borderColor: theme.colors.background,
+            },
+          ]}
+        />
+      </View>
 
       <Modal
         visible={menuOpen}
@@ -129,7 +181,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
               />
             </View>
             <ThemedText variant="label" color="muted" style={{ marginBottom: 8, paddingHorizontal: 4 }}>
-              Shopper hub
+              Menu
             </ThemedText>
             {SHOPPER_MENU.map((item) => {
               const active = activeKey === item.key;
@@ -171,8 +223,65 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
                 </PressableScale>
               );
             })}
+
             <PressableScale
-              accessibilityLabel="Close shopper menu"
+              accessibilityLabel="Tune discover filters"
+              onPress={openFiltersFromMenu}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 14,
+                paddingVertical: 14,
+                paddingHorizontal: 12,
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.background,
+                marginTop: 4,
+              }}
+            >
+              <Ionicons name="options-outline" size={24} color={theme.colors.primary} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText variant="label">Tune discover filters</ThemedText>
+                <ThemedText variant="caption" color="muted">
+                  {onOpenDiscoverFilters
+                    ? "Open the filter sheet on Discover"
+                    : "Go to Discover to adjust your feed"}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+            </PressableScale>
+
+            <PressableScale
+              accessibilityLabel="Sign out"
+              onPress={confirmSignOutFromMenu}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 14,
+                paddingVertical: 14,
+                paddingHorizontal: 12,
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: "rgba(220,38,38,0.45)",
+                backgroundColor:
+                  theme.scheme === "light" ? "rgba(220,38,38,0.06)" : "rgba(220,38,38,0.12)",
+                marginTop: 4,
+              }}
+            >
+              <Ionicons name="log-out-outline" size={24} color={STATUS_ERROR} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText variant="label" style={{ color: STATUS_ERROR }}>
+                  Sign out
+                </ThemedText>
+                <ThemedText variant="caption" color="muted">
+                  End this session on this device
+                </ThemedText>
+              </View>
+            </PressableScale>
+
+            <PressableScale
+              accessibilityLabel="Close menu"
               onPress={() => setMenuOpen(false)}
               style={{ alignItems: "center", paddingVertical: 14 }}
             >
@@ -186,3 +295,19 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  avatarWrap: {
+    position: "relative",
+  },
+  activeDot: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    zIndex: 2,
+  },
+});

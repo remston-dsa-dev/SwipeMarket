@@ -18,10 +18,13 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
+import { DiscoverEmptyState, type DiscoverEmptyVariant } from "@/components/DiscoverEmptyState";
 import { ListingCard } from "@/components/ListingCard";
+import { Logo } from "@/components/Logo";
 import { PressableScale } from "@/components/PressableScale";
 import { QuantitySheet } from "@/components/QuantitySheet";
 import { Screen } from "@/components/Screen";
@@ -30,7 +33,6 @@ import { ThemedText } from "@/components/ThemedText";
 import { useListings } from "@/hooks/useListings";
 import { fetchMyCartLines, setCartLineQtyRemote } from "@/lib/cart-remote";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
-import { signOutApp } from "@/lib/sign-out";
 import { useCartStore } from "@/stores/cart-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -144,6 +146,12 @@ export default function SwipeScreen() {
     selectedAttributes.length      + selectedVariants.length +
     selectedUnits.length           + (priceBucket === "all" ? 0 : 1) +
     (hasVariantsOnly ? 1 : 0);
+
+  const discoverEmptyVariant = useMemo((): DiscoverEmptyVariant => {
+    if (listings.length === 0) return "no-data";
+    if (filteredListings.length === 0) return "filtered";
+    return "exhausted";
+  }, [listings.length, filteredListings.length]);
 
   // ── advance: just bump the index — shared value reset happens in useEffect([index])
   const advance = useCallback(() => {
@@ -315,48 +323,99 @@ export default function SwipeScreen() {
     <Screen>
       {/* Header */}
       <View style={styles.header}>
-        <View style={{ gap: 4 }}>
-          <ThemedText variant="headline">Discover</ThemedText>
-          {current ? (
-            <ThemedText variant="caption" color="muted">
-              {filteredListings.length - index} listing
-              {filteredListings.length - index !== 1 ? "s" : ""} left
-            </ThemedText>
-          ) : null}
+        <View style={styles.headerTitleRow}>
+          <View
+            style={styles.headerLogoWrap}
+            accessibilityLabel="SwipeMarket"
+            accessibilityRole="image"
+          >
+            <Logo
+              size="sm"
+              showWordmark={false}
+              lightBackground={theme.scheme === "light"}
+            />
+          </View>
+          <View style={styles.headerTitleBlock}>
+            <View style={styles.headerDiscoverLine}>
+              <ThemedText variant="headline">Discover</ThemedText>
+            </View>
+            {current ? (
+              <ThemedText variant="caption" color="muted">
+                {filteredListings.length - index} listing
+                {filteredListings.length - index !== 1 ? "s" : ""} left
+              </ThemedText>
+            ) : null}
+          </View>
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <PressableScale
-            accessibilityLabel="Open discover filters"
+            accessibilityLabel={`Discover filters, ${activeFiltersCount} selected`}
             onPress={() => setFiltersOpen((p) => !p)}
-            style={[styles.headerBtn, { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.overlay }]}
+            style={styles.headerPlainIconHit}
           >
-            <ThemedText variant="caption">Filters</ThemedText>
-            {activeFiltersCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-                <ThemedText variant="caption" color="onPrimary" style={{ fontSize: 10, lineHeight: 12 }}>
+            <View style={styles.headerIconBadgeWrap}>
+              <Ionicons name="options-outline" size={26} color={theme.colors.primary} />
+              <View
+                style={[
+                  styles.headerCountChip,
+                  activeFiltersCount > 0
+                    ? {
+                        backgroundColor: theme.colors.primary,
+                        borderWidth: 0,
+                      }
+                    : {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                        borderWidth: 1,
+                      },
+                ]}
+              >
+                <ThemedText
+                  variant="caption"
+                  color={activeFiltersCount > 0 ? "onPrimary" : "muted"}
+                  style={styles.headerCountChipText}
+                >
                   {activeFiltersCount}
                 </ThemedText>
               </View>
-            )}
+            </View>
           </PressableScale>
 
           <PressableScale
-            accessibilityLabel="Open cart"
+            accessibilityLabel={`Cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
             onPress={() => router.push("/matches")}
-            style={[styles.headerBtn, { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.overlay }]}
+            style={styles.headerPlainIconHit}
           >
-            <ThemedText variant="caption">Cart</ThemedText>
-            {cartCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
-                <ThemedText variant="caption" color="onPrimary" style={{ fontSize: 11, lineHeight: 14 }}>
+            <View style={styles.headerIconBadgeWrap}>
+              <Ionicons name="cart-outline" size={26} color={theme.colors.secondary} />
+              <View
+                style={[
+                  styles.headerCountChip,
+                  cartCount > 0
+                    ? {
+                        backgroundColor: theme.colors.secondary,
+                        borderWidth: 0,
+                      }
+                    : {
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                        borderWidth: 1,
+                      },
+                ]}
+              >
+                <ThemedText
+                  variant="caption"
+                  color={cartCount > 0 ? "onPrimary" : "muted"}
+                  style={styles.headerCountChipText}
+                >
                   {cartCount > 99 ? "99+" : cartCount}
                 </ThemedText>
               </View>
-            )}
+            </View>
           </PressableScale>
 
-          <CustomerHeaderActions />
+          <CustomerHeaderActions onOpenDiscoverFilters={() => setFiltersOpen(true)} />
         </View>
       </View>
 
@@ -388,34 +447,14 @@ export default function SwipeScreen() {
             </GestureDetector>
           </View>
         ) : (
-          <View style={{ gap: 16 }}>
-            <ThemedText variant="headline">All caught up!</ThemedText>
-            <ThemedText variant="body" color="muted">
-              {cartCount > 0
-                ? `You have ${cartCount} item${cartCount !== 1 ? "s" : ""} waiting in your cart.`
-                : filteredListings.length === 0
-                  ? "No listings match your current filters. Try broadening your preferences."
-                  : "New listings will appear when suppliers add products."}
-            </ThemedText>
-            {cartCount > 0 && (
-              <PressableScale
-                accessibilityLabel="View cart"
-                onPress={() => router.push("/matches")}
-                style={[styles.emptyBtn, { backgroundColor: theme.colors.primary }]}
-              >
-                <ThemedText variant="label" color="onPrimary">View Cart →</ThemedText>
-              </PressableScale>
-            )}
-            <PressableScale
-              accessibilityLabel="Sign out"
-              onPress={() => {
-                void signOutApp().then(() => router.replace("/(auth)/sign-in"));
-              }}
-              style={[styles.emptyBtn, { borderWidth: 1, borderColor: theme.colors.border }]}
-            >
-              <ThemedText variant="label">Sign out</ThemedText>
-            </PressableScale>
-          </View>
+          <DiscoverEmptyState
+            variant={discoverEmptyVariant}
+            cartCount={cartCount}
+            activeFiltersCount={activeFiltersCount}
+            onClearFilters={clearFilters}
+            onViewCart={() => router.push("/matches")}
+            onOpenFilters={() => setFiltersOpen(true)}
+          />
         )}
       </View>
 
@@ -530,8 +569,52 @@ function FilterChip({ label, selected, onPress }: FilterChipProps) {
 /* ─── Styles ──────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   header:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
-  headerBtn:     { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 1 },
-  badge:         { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, alignItems: "center", justifyContent: "center" },
+  headerTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    minWidth: 0,
+    paddingRight: 8,
+  },
+  headerLogoWrap: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerDiscoverLine: {
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  headerTitleBlock: { flex: 1, gap: 4, minWidth: 0 },
+  headerPlainIconHit: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  headerIconBadgeWrap: {
+    position: "relative",
+    width: 30,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCountChip: {
+    position: "absolute",
+    top: -5,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCountChipText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    includeFontPadding: false,
+  },
 
   deckContainer: { flex: 1 },
 
@@ -539,8 +622,6 @@ const styles = StyleSheet.create({
   actionBtn:     { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
   actionBtnNope: { borderWidth: 2.5 },
   actionBtnLike: { width: 72, height: 72, borderRadius: 36 },
-
-  emptyBtn:      { alignSelf: "flex-start", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
 
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   modalSheet:    { maxHeight: "78%", paddingHorizontal: 18, paddingTop: 14, paddingBottom: 22, gap: 12 },
