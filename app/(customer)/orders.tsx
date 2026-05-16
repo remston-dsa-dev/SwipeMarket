@@ -74,7 +74,7 @@ export default function CustomerOrdersScreen() {
             <ThemedText variant="label">← Back</ThemedText>
           </PressableScale>
           <ThemedText variant="headline" numberOfLines={1} style={{ flex: 1 }}>
-            My orders
+            My Orders
           </ThemedText>
         </View>
         <CustomerHeaderActions />

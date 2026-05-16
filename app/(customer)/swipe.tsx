@@ -355,7 +355,7 @@ export default function SwipeScreen() {
             style={styles.headerPlainIconHit}
           >
             <View style={styles.headerIconBadgeWrap}>
-              <Ionicons name="options-outline" size={26} color={theme.colors.primary} />
+              <Ionicons name="options" size={26} color={theme.colors.primary} />
               <View
                 style={[
                   styles.headerCountChip,
@@ -388,7 +388,7 @@ export default function SwipeScreen() {
             style={styles.headerPlainIconHit}
           >
             <View style={styles.headerIconBadgeWrap}>
-              <Ionicons name="cart-outline" size={26} color={theme.colors.secondary} />
+              <Ionicons name="cart" size={26} color={theme.colors.secondary} />
               <View
                 style={[
                   styles.headerCountChip,
@@ -415,7 +415,7 @@ export default function SwipeScreen() {
             </View>
           </PressableScale>
 
-          <CustomerHeaderActions onOpenDiscoverFilters={() => setFiltersOpen(true)} />
+          <CustomerHeaderActions />
         </View>
       </View>
 

@@ -34,6 +34,8 @@ export default function CustomerLayout() {
       <Stack.Screen name="swipe" />
       <Stack.Screen name="matches" />
       <Stack.Screen name="orders" />
+      <Stack.Screen name="returns" />
+      <Stack.Screen name="favorites" />
       <Stack.Screen name="more" />
     </Stack>
   );
