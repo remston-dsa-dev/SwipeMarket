@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import * as Linking from "expo-linking";
-import { syncSessionFromSupabaseAuth } from "@/lib/auth-session";
+import { loadSupabaseSession, syncSessionFromSupabaseAuth } from "@/lib/auth-session";
 import {
   completeOAuthSessionFromUrlIfNeeded,
   urlLooksLikeAuthRedirect,
@@ -28,7 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) store.setAuthInitialized(true);
     }
 
-    void supabase.auth.getSession().then(({ data }) => apply(data.session));
+    void (async () => {
+      try {
+        await apply(await loadSupabaseSession());
+      } catch (error) {
+        console.warn("[auth] session bootstrap failed", error);
+        await apply(null);
+      }
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       void apply(session);
@@ -68,7 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        welcome-screen guards re-evaluate. */
     const appStateSub = AppState.addEventListener("change", (next: AppStateStatus) => {
       if (next !== "active") return;
-      void supabase.auth.getSession().then(({ data }) => apply(data.session));
+      void loadSupabaseSession()
+        .then((session) => apply(session))
+        .catch((error) => {
+          console.warn("[auth] foreground session refresh failed", error);
+          void apply(null);
+        });
     });
 
     return () => {

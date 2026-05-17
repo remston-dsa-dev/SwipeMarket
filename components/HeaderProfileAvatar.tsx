@@ -16,7 +16,7 @@ type Props = {
   size?: number;
   /**
    * When set, tapping the avatar runs this instead of the sign-out flow
-   * (e.g. open the shopper hub menu from `CustomerHeaderActions`).
+   * (e.g. open the shopper or partner hub menu from header actions).
    */
   onAvatarPress?: () => void;
 };

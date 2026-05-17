@@ -4,7 +4,7 @@ import {
   hasEmailBeenCelebrated,
   hasUserBeenCelebrated,
 } from "@/lib/pending-verification";
-import { supabase } from "@/lib/supabase";
+import { loadSupabaseSession } from "@/lib/auth-session";
 import { useSessionStore } from "@/stores/session-store";
 
 /* User confirmed their email in the last few minutes → treat the next session
@@ -48,9 +48,9 @@ export function useShouldCelebrate(): boolean | null {
 
     (async () => {
       try {
-        const [pending, sessionRes, userCelebrated] = await Promise.all([
+        const [pending, session, userCelebrated] = await Promise.all([
           getPendingVerification(),
-          supabase.auth.getSession(),
+          loadSupabaseSession(),
           hasUserBeenCelebrated(userId),
         ]);
         if (cancelled) return;
@@ -60,7 +60,7 @@ export function useShouldCelebrate(): boolean | null {
           return;
         }
 
-        const user = sessionRes.data.session?.user;
+        const user = session?.user;
         if (!user) {
           setDecision(false);
           return;

@@ -1,8 +1,56 @@
-import type { Session } from "@supabase/supabase-js";
+import type { AuthError, Session } from "@supabase/supabase-js";
 import { ensureProfileRow, isProfileOnboardingComplete } from "@/lib/profile-onboarding";
 import { supabase } from "@/lib/supabase";
 import type { UserRole } from "@/stores/session-store";
 import { useSessionStore } from "@/stores/session-store";
+
+/** Expired, revoked, or missing refresh token in local storage (common after reinstall or project change). */
+export function isStaleRefreshTokenError(error: unknown): boolean {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as AuthError).message)
+      : String(error ?? "");
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("refresh token") ||
+    normalized.includes("refresh_token") ||
+    normalized.includes("invalid jwt")
+  );
+}
+
+/** Drop broken auth tokens without calling the server (refresh would fail anyway). */
+export async function clearStaleSupabaseAuth() {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // Storage may already be empty.
+  }
+  useSessionStore.getState().clearSession();
+}
+
+/**
+ * Loads the Supabase session, recovering when a persisted refresh token is invalid
+ * so startup does not throw or leave the app in a half-signed-in state.
+ */
+export async function loadSupabaseSession(): Promise<Session | null> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error && isStaleRefreshTokenError(error)) {
+      await clearStaleSupabaseAuth();
+      return null;
+    }
+    if (error) {
+      console.warn("[auth] getSession", error.message);
+    }
+    return data.session;
+  } catch (error) {
+    if (isStaleRefreshTokenError(error)) {
+      await clearStaleSupabaseAuth();
+      return null;
+    }
+    throw error;
+  }
+}
 
 function normalizeRole(value: string | null | undefined): UserRole {
   return value === "supplier" ? "supplier" : "customer";

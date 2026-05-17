@@ -5,13 +5,21 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Image } from "expo-image";
+import { ProductListingTemplateModal } from "@/components/ProductListingTemplateModal";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
+import { SupplierInventoryEmptyState } from "@/components/SupplierInventoryEmptyState";
 import { PressableScale } from "@/components/PressableScale";
 import { ProductRow } from "@/components/ProductRow";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { productToInsertRow } from "@/lib/product-insert";
-import { buildSupplierTemplateCsv, parseSupplierCsvWithReport } from "@/lib/supplier-bulk";
+import {
+  buildSupplierTemplateCsv,
+  buildSupplierTemplateXlsxBase64,
+  isCsvImportAsset,
+  parseSupplierCsvWithReport,
+  parseSupplierXlsxWithReport,
+} from "@/lib/supplier-bulk";
 import { supabase } from "@/lib/supabase";
 import { useSupplierProducts } from "@/hooks/useSupplierProducts";
 import { useSessionStore } from "@/stores/session-store";
@@ -27,6 +35,7 @@ export default function SupplierDashboardScreen() {
   const { data: products = [], isPending: productsLoading } = useSupplierProducts(supplierId);
   const [pendingImport, setPendingImport] = useState<Omit<Product, "id">[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [templateInfoOpen, setTemplateInfoOpen] = useState(false);
 
   const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
   const totalValue = products.reduce(
@@ -34,7 +43,7 @@ export default function SupplierDashboardScreen() {
     0,
   );
 
-  async function handleDownloadTemplate() {
+  async function handleDownloadTemplateCsv() {
     try {
       const csv = buildSupplierTemplateCsv();
       const fileUri = `${FileSystem.cacheDirectory}swipemarket-supplier-template.csv`;
@@ -45,21 +54,49 @@ export default function SupplierDashboardScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: "text/csv",
-          dialogTitle: "Download supplier bulk template",
+          dialogTitle: "Download product listing template (.csv)",
           UTI: "public.comma-separated-values-text",
         });
       } else {
-        Alert.alert("Template ready", `CSV saved at:\n${fileUri}`);
+        Alert.alert("Template ready", `.csv saved at:\n${fileUri}`);
       }
     } catch (error) {
       Alert.alert("Template failed", (error as Error).message);
     }
   }
 
-  async function handleImportCsv() {
+  async function handleDownloadTemplateXlsx() {
+    try {
+      const base64 = buildSupplierTemplateXlsxBase64();
+      const fileUri = `${FileSystem.cacheDirectory}swipemarket-supplier-template.xlsx`;
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          dialogTitle: "Download product listing template (.xlsx)",
+          UTI: "org.openxmlformats.spreadsheetml.sheet",
+        });
+      } else {
+        Alert.alert("Template ready", `.xlsx saved at:\n${fileUri}`);
+      }
+    } catch (error) {
+      Alert.alert("Template failed", (error as Error).message);
+    }
+  }
+
+  async function handleImportInventoryFile() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["text/csv", "application/vnd.ms-excel", "text/comma-separated-values"],
+        type: [
+          "text/csv",
+          "text/comma-separated-values",
+          "application/csv",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled) return;
@@ -68,12 +105,23 @@ export default function SupplierDashboardScreen() {
         Alert.alert("Import failed", "Could not read the selected file.");
         return;
       }
-      const csv = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-      const report = parseSupplierCsvWithReport(csv);
+      const useCsv = isCsvImportAsset(asset.name, asset.mimeType ?? null);
+      const report = useCsv
+        ? parseSupplierCsvWithReport(
+            await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.UTF8,
+            }),
+          )
+        : parseSupplierXlsxWithReport(
+            await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            }),
+          );
       if (report.successRows.length === 0) {
-        Alert.alert("No rows found", "The selected file has no importable products.");
+        Alert.alert(
+          "No rows found",
+          "The file has no importable product rows after the header row.",
+        );
         return;
       }
       setPendingImport(report.successRows);
@@ -174,47 +222,65 @@ export default function SupplierDashboardScreen() {
         <SupplierHeaderActions />
       </View>
 
-      <View style={{ gap: 10, marginBottom: 16 }}>
-        <PressableScale
-          accessibilityLabel="Add new product"
-          onPress={() => router.push("/(supplier)/add-product")}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            paddingVertical: 14,
-            borderRadius: theme.radius.md,
-            backgroundColor: theme.colors.primary,
-          }}
-        >
-          <ThemedText variant="label" color="onPrimary">
-            + New Product
-          </ThemedText>
-        </PressableScale>
-
-        <View style={{ flexDirection: "row", gap: 10 }}>
+      {!productsLoading && products.length > 0 ? (
+        <View style={{ gap: 10, marginBottom: 16 }}>
           <PressableScale
-            accessibilityLabel="Download bulk upload template"
-            onPress={handleDownloadTemplate}
+            accessibilityLabel="Add new product"
+            onPress={() => router.push("/(supplier)/add-product")}
             style={{
-              flex: 1,
+              flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              paddingVertical: 12,
+              gap: 8,
+              paddingVertical: 14,
               borderRadius: theme.radius.md,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
+              backgroundColor: theme.colors.primary,
             }}
           >
-            <ThemedText variant="caption">Download Template</ThemedText>
+            <ThemedText variant="label" color="onPrimary">
+              + New Product
+            </ThemedText>
           </PressableScale>
+
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <PressableScale
+              accessibilityLabel="Download product listing template as csv"
+              onPress={handleDownloadTemplateCsv}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 12,
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              }}
+            >
+              <ThemedText variant="caption">Download .csv</ThemedText>
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Download product listing template as xlsx"
+              onPress={handleDownloadTemplateXlsx}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 12,
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              }}
+            >
+              <ThemedText variant="caption">Download .xlsx</ThemedText>
+            </PressableScale>
+          </View>
+
           <PressableScale
-            accessibilityLabel="Import bulk CSV"
-            onPress={handleImportCsv}
+            accessibilityLabel="Add your inventory from csv or xlsx file"
+            onPress={handleImportInventoryFile}
             style={{
-              flex: 1,
               alignItems: "center",
               justifyContent: "center",
               paddingVertical: 12,
@@ -224,22 +290,44 @@ export default function SupplierDashboardScreen() {
               backgroundColor: theme.colors.overlay,
             }}
           >
-            <ThemedText variant="caption" color="secondary">Import Bulk File</ThemedText>
+            <ThemedText variant="caption" color="secondary">
+              Add your Inventory (.csv or .xlsx)
+            </ThemedText>
+          </PressableScale>
+
+          <PressableScale
+            accessibilityLabel="Review product listing template field reference"
+            onPress={() => setTemplateInfoOpen(true)}
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+              paddingVertical: 12,
+              borderRadius: theme.radius.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.background,
+            }}
+          >
+            <ThemedText variant="caption" color="primary">
+              Review Product Listing Template
+            </ThemedText>
           </PressableScale>
         </View>
-      </View>
+      ) : null}
 
       {productsLoading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 40 }}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : products.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", gap: 12 }}>
-          <ThemedText variant="headline">No products yet</ThemedText>
-          <ThemedText variant="body" color="muted">
-            Tap "New Product" to add your first listing. Customers will see it
-            in their swipe deck immediately.
-          </ThemedText>
+        <View style={{ flex: 1, minHeight: 320 }}>
+          <SupplierInventoryEmptyState
+            onAddProduct={() => router.push("/(supplier)/add-product")}
+            onDownloadTemplateCsv={handleDownloadTemplateCsv}
+            onDownloadTemplateXlsx={handleDownloadTemplateXlsx}
+            onImportInventoryFile={handleImportInventoryFile}
+            onReviewTemplate={() => setTemplateInfoOpen(true)}
+          />
         </View>
       ) : (
         <FlatList
@@ -276,7 +364,7 @@ export default function SupplierDashboardScreen() {
           >
             <ThemedText variant="headline">Review Before Publishing</ThemedText>
             <ThemedText variant="caption" color="muted">
-              {pendingImport.length} products parsed from your file. Confirm to publish them live.
+              {pendingImport.length} products parsed from your spreadsheet. Confirm to publish them live.
             </ThemedText>
             <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 8 }}>
               {pendingImport.map((product, idx) => (
@@ -451,6 +539,11 @@ export default function SupplierDashboardScreen() {
           </View>
         </View>
       </Modal>
+
+      <ProductListingTemplateModal
+        visible={templateInfoOpen}
+        onClose={() => setTemplateInfoOpen(false)}
+      />
     </Screen>
   );
 }
