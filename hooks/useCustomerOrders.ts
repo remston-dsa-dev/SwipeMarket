@@ -9,6 +9,9 @@ export type CustomerOrderItem = {
   id: string;
   product_id: string;
   qty: number;
+  return_qty: number;
+  status: OrderStatus;
+  shipped_at: string | null;
   unit_price_cents: number;
   title: string;
   image_url: string;
@@ -35,7 +38,7 @@ async function fetchCustomerOrders(customerId: string): Promise<CustomerOrder[]>
       total_cents,
       created_at,
       supplier:profiles!orders_supplier_id_fkey(full_name),
-      order_items(id, product_id, qty, unit_price_cents, title, image_url)
+      order_items(id, product_id, qty, return_qty, status, shipped_at, unit_price_cents, title, image_url)
     `,
     )
     .eq("customer_id", customerId)
@@ -46,15 +49,22 @@ async function fetchCustomerOrders(customerId: string): Promise<CustomerOrder[]>
   return (data ?? []).map((row) => {
     const supplier = row.supplier as { full_name: string | null } | { full_name: string | null }[] | null;
     const s = Array.isArray(supplier) ? supplier[0] ?? null : supplier;
-    const items = row.order_items as CustomerOrderItem[] | null;
+    const rawItems = row.order_items as CustomerOrderItem[] | null;
+    const orderStatus = row.status as OrderStatus;
+    const items = (rawItems ?? []).map((item) => ({
+      ...item,
+      return_qty: Number(item.return_qty ?? 0),
+      status: (item.status ?? orderStatus) as OrderStatus,
+      shipped_at: item.shipped_at ?? null,
+    }));
     return {
       id: row.id,
       supplier_id: row.supplier_id,
-      status: row.status as OrderStatus,
+      status: orderStatus,
       total_cents: Number(row.total_cents),
       created_at: row.created_at,
       supplier: s,
-      order_items: items ?? [],
+      order_items: items,
     };
   });
 }

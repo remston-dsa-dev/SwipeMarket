@@ -1,14 +1,13 @@
 import { useMemo } from "react";
 import { ActivityIndicator, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Image } from "expo-image";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
+import { ShopperOrderCard } from "@/components/ShopperOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { useCustomerOrders, type CustomerOrder } from "@/hooks/useCustomerOrders";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
-import { orderStatusLabel } from "@/lib/order-status";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -137,71 +136,3 @@ export default function CustomerOrdersScreen() {
   );
 }
 
-function ShopperOrderCard({ order }: { order: CustomerOrder }) {
-  const theme = useTheme();
-  const when = new Date(order.created_at).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  return (
-    <View
-      style={{
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        padding: 16,
-        gap: 12,
-        backgroundColor: theme.colors.surface,
-      }}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <ThemedText variant="caption" color="muted">
-            {when}
-          </ThemedText>
-          <ThemedText variant="headline">${(order.total_cents / 100).toFixed(2)}</ThemedText>
-        </View>
-        <View
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: theme.radius.pill,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.overlay,
-          }}
-        >
-          <ThemedText variant="caption" color="primary">
-            {orderStatusLabel(order.status)}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={{ gap: 10 }}>
-        {order.order_items.map((line) => (
-          <View
-            key={line.id}
-            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-          >
-            <Image
-              source={{ uri: line.image_url }}
-              style={{ width: 44, height: 44, borderRadius: theme.radius.sm }}
-              contentFit="cover"
-            />
-            <View style={{ flex: 1 }}>
-              <ThemedText variant="label" numberOfLines={2}>
-                {line.title}
-              </ThemedText>
-              <ThemedText variant="caption" color="muted">
-                {line.qty} × ${(line.unit_price_cents / 100).toFixed(2)}
-              </ThemedText>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}

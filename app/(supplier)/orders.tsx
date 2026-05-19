@@ -1,24 +1,17 @@
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Image } from "expo-image";
+import { OrderStatusPickerSheet } from "@/components/OrderStatusPickerSheet";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
+import { SupplierOrderCard } from "@/components/SupplierOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { useSupplierOrders, type SupplierOrder } from "@/hooks/useSupplierOrders";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
-import { ORDER_STATUSES, orderStatusLabel, type OrderStatus } from "@/lib/order-status";
-import { supplierSetOrderStatus } from "@/lib/orders-remote";
+import type { OrderStatus } from "@/lib/order-status";
+import { supplierSetOrderItemStatus, supplierSetOrderStatus } from "@/lib/orders-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -28,14 +21,24 @@ function shopperLabel(order: SupplierOrder): string {
   return `Shopper · ${order.customer_id.slice(0, 8)}…`;
 }
 
+type StatusTarget =
+  | { kind: "order"; order: SupplierOrder }
+  | {
+      kind: "line";
+      order: SupplierOrder;
+      lineId: string;
+      lineTitle: string;
+      status: OrderStatus;
+    };
+
 export default function SupplierOrdersScreen() {
   const router = useRouter();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const supplierId = useSessionStore((s) => s.userId);
   const { data: orders = [], isPending, error } = useSupplierOrders(supplierId);
-  const [statusModal, setStatusModal] = useState<SupplierOrder | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const sections = useMemo(() => {
     const byCustomer = new Map<string, SupplierOrder[]>();
@@ -58,18 +61,37 @@ export default function SupplierOrdersScreen() {
       );
   }, [orders]);
 
-  async function applyStatus(orderId: string, status: OrderStatus) {
-    setSavingId(orderId);
+  async function applyStatus(status: OrderStatus) {
+    if (!statusTarget) return;
+
+    const key =
+      statusTarget.kind === "order"
+        ? `order:${statusTarget.order.id}`
+        : `item:${statusTarget.lineId}`;
+
+    setSavingKey(key);
     try {
-      await supplierSetOrderStatus(orderId, status);
+      if (statusTarget.kind === "order") {
+        await supplierSetOrderStatus(statusTarget.order.id, status);
+      } else {
+        await supplierSetOrderItemStatus(statusTarget.lineId, status);
+      }
       void queryClient.invalidateQueries({ queryKey: ["supplier-orders", supplierId] });
-      setStatusModal(null);
+      void queryClient.invalidateQueries({ queryKey: ["customer-orders"] });
+      setStatusTarget(null);
     } catch (e) {
       Alert.alert("Could not update status", (e as Error).message);
     } finally {
-      setSavingId(null);
+      setSavingKey(null);
     }
   }
+
+  const pickerTitle =
+    statusTarget?.kind === "line" ? "Product status" : "All products in order";
+  const pickerSubtitle =
+    statusTarget?.kind === "line" ? statusTarget.lineTitle : undefined;
+  const pickerStatus =
+    statusTarget?.kind === "line" ? statusTarget.status : statusTarget?.order.status ?? "placed";
 
   if (!isSupabaseConfigured()) {
     return (
@@ -121,8 +143,8 @@ export default function SupplierOrdersScreen() {
         <View style={{ flex: 1, justifyContent: "center", gap: 10 }}>
           <ThemedText variant="headline">No orders yet</ThemedText>
           <ThemedText variant="body" color="muted">
-            When shoppers check out items from your catalog, each order appears here with status
-            you can update through fulfillment.
+            When shoppers check out items from your catalog, each order appears here. Tap a product
+            status to update it individually, or the order badge to update every product at once.
           </ThemedText>
         </View>
       ) : (
@@ -137,11 +159,23 @@ export default function SupplierOrdersScreen() {
                 {section.title}
               </ThemedText>
               {section.data.map((order) => (
-                <OrderCard
+                <SupplierOrderCard
                   key={order.id}
                   order={order}
-                  busy={savingId === order.id}
-                  onChangeStatus={() => setStatusModal(order)}
+                  orderStatusBusy={savingKey === `order:${order.id}`}
+                  lineStatusBusyId={
+                    savingKey?.startsWith("item:") ? savingKey.slice(5) : null
+                  }
+                  onChangeOrderStatus={() => setStatusTarget({ kind: "order", order })}
+                  onChangeLineStatus={(line) =>
+                    setStatusTarget({
+                      kind: "line",
+                      order,
+                      lineId: line.id,
+                      lineTitle: line.title,
+                      status: line.status,
+                    })
+                  }
                 />
               ))}
             </View>
@@ -149,155 +183,18 @@ export default function SupplierOrdersScreen() {
         />
       )}
 
-      <Modal
-        visible={statusModal !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setStatusModal(null)}
-      >
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Pressable
-            accessibilityLabel="Dismiss"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.45)" }]}
-            onPress={() => setStatusModal(null)}
-          />
-          <View
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderTopLeftRadius: theme.radius.lg,
-              borderTopRightRadius: theme.radius.lg,
-              paddingHorizontal: 20,
-              paddingTop: 16,
-              paddingBottom: 36,
-              gap: 8,
-            }}
-          >
-            <ThemedText variant="headline" style={{ marginBottom: 8 }}>
-              Order status
-            </ThemedText>
-            {statusModal
-              ? ORDER_STATUSES.map((s) => (
-                  <PressableScale
-                    key={s}
-                    accessibilityLabel={orderStatusLabel(s)}
-                    onPress={() => {
-                      if (savingId !== null) return;
-                      void applyStatus(statusModal.id, s);
-                    }}
-                    style={{
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      borderRadius: theme.radius.md,
-                      borderWidth: 1,
-                      borderColor:
-                        statusModal.status === s ? theme.colors.primary : theme.colors.border,
-                      backgroundColor:
-                        statusModal.status === s
-                          ? theme.scheme === "light"
-                            ? "rgba(124,58,237,0.08)"
-                            : "rgba(124,58,237,0.18)"
-                          : theme.colors.background,
-                    }}
-                  >
-                    <ThemedText variant="label" color="primary">
-                      {orderStatusLabel(s)}
-                    </ThemedText>
-                  </PressableScale>
-                ))
-              : null}
-            <PressableScale
-              accessibilityLabel="Close"
-              onPress={() => setStatusModal(null)}
-              style={{ alignItems: "center", paddingVertical: 12 }}
-            >
-              <ThemedText variant="caption" color="muted">
-                Cancel
-              </ThemedText>
-            </PressableScale>
-          </View>
-        </View>
-      </Modal>
+      <OrderStatusPickerSheet
+        visible={statusTarget !== null}
+        title={pickerTitle}
+        subtitle={pickerSubtitle}
+        currentStatus={pickerStatus}
+        saving={savingKey !== null}
+        onSelect={(status) => void applyStatus(status)}
+        onClose={() => {
+          if (savingKey !== null) return;
+          setStatusTarget(null);
+        }}
+      />
     </Screen>
-  );
-}
-
-function OrderCard({
-  order,
-  busy,
-  onChangeStatus,
-}: {
-  order: SupplierOrder;
-  busy: boolean;
-  onChangeStatus: () => void;
-}) {
-  const theme = useTheme();
-  const when = new Date(order.created_at).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  return (
-    <View
-      style={{
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        padding: 16,
-        gap: 12,
-        backgroundColor: theme.colors.surface,
-      }}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <ThemedText variant="caption" color="muted">
-            {when}
-          </ThemedText>
-          <ThemedText variant="headline">${(order.total_cents / 100).toFixed(2)}</ThemedText>
-        </View>
-        <PressableScale
-          accessibilityLabel="Change order status"
-          onPress={() => {
-            if (busy) return;
-            onChangeStatus();
-          }}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: theme.radius.pill,
-            borderWidth: 1,
-            borderColor: theme.colors.primary,
-          }}
-        >
-          <ThemedText variant="caption" color="primary">
-            {busy ? "…" : orderStatusLabel(order.status)}
-          </ThemedText>
-        </PressableScale>
-      </View>
-
-      <View style={{ gap: 10 }}>
-        {order.order_items.map((line) => (
-          <View
-            key={line.id}
-            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-          >
-            <Image
-              source={{ uri: line.image_url }}
-              style={{ width: 44, height: 44, borderRadius: theme.radius.sm }}
-              contentFit="cover"
-            />
-            <View style={{ flex: 1 }}>
-              <ThemedText variant="label" numberOfLines={2}>
-                {line.title}
-              </ThemedText>
-              <ThemedText variant="caption" color="muted">
-                {line.qty} × ${(line.unit_price_cents / 100).toFixed(2)}
-              </ThemedText>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
   );
 }

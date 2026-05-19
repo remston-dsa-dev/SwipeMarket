@@ -163,6 +163,9 @@ export type Database = {
           order_id: string;
           product_id: string;
           qty: number;
+          return_qty: number;
+          status: string;
+          shipped_at: string | null;
           unit_price_cents: number;
           title: string;
           image_url: string;
@@ -172,6 +175,9 @@ export type Database = {
           order_id: string;
           product_id: string;
           qty: number;
+          return_qty?: number;
+          status?: string;
+          shipped_at?: string | null;
           unit_price_cents: number;
           title: string;
           image_url: string;
@@ -180,6 +186,9 @@ export type Database = {
           order_id?: string;
           product_id?: string;
           qty?: number;
+          return_qty?: number;
+          status?: string;
+          shipped_at?: string | null;
           unit_price_cents?: number;
           title?: string;
           image_url?: string;
@@ -189,6 +198,10 @@ export type Database = {
     Functions: {
       supplier_set_order_status: {
         Args: { p_order_id: string; p_status: string };
+        Returns: undefined;
+      };
+      supplier_set_order_item_status: {
+        Args: { p_order_item_id: string; p_status: string };
         Returns: undefined;
       };
     };

@@ -1,0 +1,3 @@
+export const PREVIEW_LINE_COUNT = 2;
+export const COLLAPSED_CARD_MIN_HEIGHT = 300;
+export const COLLAPSED_LINES_MAX_HEIGHT = 116;

@@ -1,0 +1,105 @@
+import { View } from "react-native";
+import { Image } from "expo-image";
+import { PressableScale } from "@/components/PressableScale";
+import { ThemedText } from "@/components/ThemedText";
+import {
+  isLineReturnEligible,
+  returnWarrantyDaysRemaining,
+  type OrderLineFields,
+} from "@/lib/order-line";
+import { orderStatusColor, orderStatusLabel } from "@/lib/order-status";
+import { useTheme } from "@/theme/ThemeContext";
+
+export type OrderLineDisplay = OrderLineFields & {
+  id: string;
+  title: string;
+  image_url: string;
+  unit_price_cents: number;
+};
+
+type Props = {
+  line: OrderLineDisplay;
+  onStatusPress?: () => void;
+  statusBusy?: boolean;
+};
+
+export function OrderLineRow({ line, onStatusPress, statusBusy }: Props) {
+  const theme = useTheme();
+  const color = orderStatusColor(line.status);
+  const eligible = isLineReturnEligible(line);
+  const daysLeft = returnWarrantyDaysRemaining(line.shipped_at);
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <Image
+        source={{ uri: line.image_url }}
+        style={{ width: 44, height: 44, borderRadius: theme.radius.sm }}
+        contentFit="cover"
+      />
+      <View style={{ flex: 1, gap: 4 }}>
+        <ThemedText variant="label" numberOfLines={1}>
+          {line.title}
+        </ThemedText>
+        <ThemedText variant="caption" color="muted">
+          {line.qty} × ${(line.unit_price_cents / 100).toFixed(2)}
+          {line.return_qty > 0 ? ` · ${line.return_qty} returned` : ""}
+        </ThemedText>
+        {eligible && daysLeft !== null && (
+          <ThemedText variant="caption" style={{ color: orderStatusColor("completed") }}>
+            Return eligible · {daysLeft} day{daysLeft === 1 ? "" : "s"} left
+          </ThemedText>
+        )}
+        {line.status === "shipped" && !eligible && line.return_qty < line.qty && daysLeft === 0 && (
+          <ThemedText variant="caption" color="muted">
+            Return window ended
+          </ThemedText>
+        )}
+      </View>
+      {onStatusPress ? (
+        <PressableScale
+          accessibilityLabel={`Change status for ${line.title}`}
+          onPress={() => {
+            if (statusBusy) return;
+            onStatusPress();
+          }}
+        >
+          <LineStatusBadge color={color} status={line.status} busy={statusBusy} editable />
+        </PressableScale>
+      ) : (
+        <LineStatusBadge color={color} status={line.status} />
+      )}
+    </View>
+  );
+}
+
+function LineStatusBadge({
+  color,
+  status,
+  busy,
+  editable,
+}: {
+  color: string;
+  status: OrderLineDisplay["status"];
+  busy?: boolean;
+  editable?: boolean;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: theme.radius.pill,
+        borderWidth: 1,
+        borderColor: editable ? theme.colors.primary : color,
+        backgroundColor: `${color}14`,
+        maxWidth: 108,
+      }}
+    >
+      <ThemedText variant="caption" style={{ color }} numberOfLines={1}>
+        {busy ? "…" : orderStatusLabel(status)}
+      </ThemedText>
+    </View>
+  );
+}
