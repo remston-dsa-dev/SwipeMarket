@@ -1,13 +1,13 @@
 import { STATUS_ERROR, STATUS_SUCCESS, STATUS_WARNING } from "@/lib/status-colors";
 
-export type OrderStatus = "placed" | "processing" | "shipped" | "completed" | "cancelled";
+export type OrderStatus = "placed" | "processing" | "shipped" | "delivered" | "cancelled";
 
 /** Canonical fulfillment order (cancelled is terminal, not part of the timeline). */
 export const ORDER_STATUSES: OrderStatus[] = [
   "placed",
   "processing",
   "shipped",
-  "completed",
+  "delivered",
   "cancelled",
 ];
 
@@ -16,7 +16,7 @@ export const ORDER_TIMELINE_STEPS: OrderStatus[] = [
   "placed",
   "processing",
   "shipped",
-  "completed",
+  "delivered",
 ];
 
 export type TimelineStepState = "complete" | "current" | "upcoming";
@@ -46,7 +46,7 @@ export function orderStatusLabel(s: OrderStatus): string {
       return "Processing";
     case "shipped":
       return "Shipped";
-    case "completed":
+    case "delivered":
       return "Delivered";
     case "cancelled":
       return "Cancelled";
@@ -63,7 +63,7 @@ export function orderStatusColor(s: OrderStatus): string {
       return STATUS_WARNING;
     case "shipped":
       return "#2563EB";
-    case "completed":
+    case "delivered":
       return STATUS_SUCCESS;
     case "cancelled":
       return STATUS_ERROR;
@@ -84,4 +84,19 @@ export function orderStatusBadgeStyle(status: OrderStatus): {
     backgroundColor: `${textColor}18`,
     textColor,
   };
+}
+
+/** Maps legacy DB/API value to the canonical status (for realtime rows not yet migrated). */
+export function normalizeOrderStatus(value: string): OrderStatus {
+  if (value === "completed") return "delivered";
+  if (
+    value === "placed" ||
+    value === "processing" ||
+    value === "shipped" ||
+    value === "delivered" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  return "placed";
 }

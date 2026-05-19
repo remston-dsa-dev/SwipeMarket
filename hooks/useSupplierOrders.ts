@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
-import type { OrderStatus } from "@/lib/order-status";
+import { normalizeOrderStatus, type OrderStatus } from "@/lib/order-status";
 import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
 import { supabase } from "@/lib/supabase";
 
@@ -50,11 +50,11 @@ async function fetchSupplierOrders(supplierId: string): Promise<SupplierOrder[]>
     const customer = row.customer as { full_name: string | null } | { full_name: string | null }[] | null;
     const c = Array.isArray(customer) ? customer[0] ?? null : customer;
     const rawItems = row.order_items as SupplierOrderItem[] | null;
-    const orderStatus = row.status as OrderStatus;
+    const orderStatus = normalizeOrderStatus(String(row.status));
     const items = (rawItems ?? []).map((item) => ({
       ...item,
       return_qty: Number(item.return_qty ?? 0),
-      status: (item.status ?? orderStatus) as OrderStatus,
+      status: normalizeOrderStatus(String(item.status ?? orderStatus)),
       shipped_at: item.shipped_at ?? null,
     }));
     return {

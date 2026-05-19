@@ -84,7 +84,7 @@ export function ShopperOrderCard({ order }: Props) {
           }}
         >
           <ThemedText variant="caption" color="secondary">
-            Shipped lines are eligible to return within {RETURN_WARRANTY_DAYS} days of delivery.
+            Delivered products are eligible to return within {RETURN_WARRANTY_DAYS} days of delivery.
           </ThemedText>
         </View>
       )}

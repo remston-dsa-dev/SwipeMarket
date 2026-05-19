@@ -36,7 +36,7 @@ export function orderSummaryLabel(
 
 export function isLineReturnEligible(line: OrderLineFields): boolean {
   if (line.return_qty >= line.qty) return false;
-  if (line.status !== "shipped" && line.status !== "completed") return false;
+  if (line.status !== "delivered") return false;
   if (!line.shipped_at) return false;
   const shippedMs = new Date(line.shipped_at).getTime();
   if (Number.isNaN(shippedMs)) return false;

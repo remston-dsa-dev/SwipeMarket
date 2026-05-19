@@ -45,11 +45,11 @@ export function OrderLineRow({ line, onStatusPress, statusBusy }: Props) {
           {line.return_qty > 0 ? ` · ${line.return_qty} returned` : ""}
         </ThemedText>
         {eligible && daysLeft !== null && (
-          <ThemedText variant="caption" style={{ color: orderStatusColor("completed") }}>
+          <ThemedText variant="caption" style={{ color: orderStatusColor("delivered") }}>
             Return eligible · {daysLeft} day{daysLeft === 1 ? "" : "s"} left
           </ThemedText>
         )}
-        {line.status === "shipped" && !eligible && line.return_qty < line.qty && daysLeft === 0 && (
+        {line.status === "delivered" && !eligible && line.return_qty < line.qty && daysLeft === 0 && (
           <ThemedText variant="caption" color="muted">
             Return window ended
           </ThemedText>

@@ -98,7 +98,7 @@ export function SupplierOrderCard({
           }}
         >
           <ThemedText variant="caption" color="secondary">
-            Shipped lines are in the {RETURN_WARRANTY_DAYS}-day return window for shoppers.
+            Delivered products are in the {RETURN_WARRANTY_DAYS}-day return window for shoppers.
           </ThemedText>
         </View>
       )}
