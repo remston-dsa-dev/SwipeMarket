@@ -7,7 +7,7 @@ import {
   returnWarrantyDaysRemaining,
   type OrderLineFields,
 } from "@/lib/order-line";
-import { orderStatusColor, orderStatusLabel } from "@/lib/order-status";
+import { orderStatusBadgeStyle, orderStatusColor, orderStatusLabel } from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
 export type OrderLineDisplay = OrderLineFields & {
@@ -63,27 +63,24 @@ export function OrderLineRow({ line, onStatusPress, statusBusy }: Props) {
             onStatusPress();
           }}
         >
-          <LineStatusBadge color={color} status={line.status} busy={statusBusy} editable />
+          <LineStatusBadge status={line.status} busy={statusBusy} />
         </PressableScale>
       ) : (
-        <LineStatusBadge color={color} status={line.status} />
+        <LineStatusBadge status={line.status} />
       )}
     </View>
   );
 }
 
 function LineStatusBadge({
-  color,
   status,
   busy,
-  editable,
 }: {
-  color: string;
   status: OrderLineDisplay["status"];
   busy?: boolean;
-  editable?: boolean;
 }) {
   const theme = useTheme();
+  const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(status);
 
   return (
     <View
@@ -92,12 +89,12 @@ function LineStatusBadge({
         paddingVertical: 6,
         borderRadius: theme.radius.pill,
         borderWidth: 1,
-        borderColor: editable ? theme.colors.primary : color,
-        backgroundColor: `${color}14`,
+        borderColor,
+        backgroundColor,
         maxWidth: 108,
       }}
     >
-      <ThemedText variant="caption" style={{ color }} numberOfLines={1}>
+      <ThemedText variant="caption" style={{ color: textColor }} numberOfLines={1}>
         {busy ? "…" : orderStatusLabel(status)}
       </ThemedText>
     </View>

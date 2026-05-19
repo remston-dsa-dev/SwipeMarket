@@ -24,31 +24,7 @@ export function OrderStatusTimeline({ status }: Props) {
   const theme = useTheme();
 
   if (status === "cancelled") {
-    const cancelColor = orderStatusColor("cancelled");
-    return (
-      <View style={{ gap: 10 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            alignSelf: "flex-start",
-            gap: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: theme.radius.pill,
-            backgroundColor: `${cancelColor}12`,
-            borderWidth: 1,
-            borderColor: `${cancelColor}40`,
-          }}
-        >
-          <Ionicons name="close-circle" size={16} color={cancelColor} />
-          <ThemedText variant="caption" style={{ color: cancelColor, fontWeight: "600" }}>
-            {orderStatusLabel("cancelled")}
-          </ThemedText>
-        </View>
-        <TimelineTrack status="placed" frozen trackMuted={theme.colors.border} surface={theme.colors.surface} />
-      </View>
-    );
+    return null;
   }
 
   return (

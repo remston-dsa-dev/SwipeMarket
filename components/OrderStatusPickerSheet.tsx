@@ -1,7 +1,12 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { ORDER_STATUSES, orderStatusLabel, type OrderStatus } from "@/lib/order-status";
+import {
+  ORDER_STATUSES,
+  orderStatusBadgeStyle,
+  orderStatusLabel,
+  type OrderStatus,
+} from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
@@ -52,33 +57,36 @@ export function OrderStatusPickerSheet({
               {subtitle}
             </ThemedText>
           ) : null}
-          {ORDER_STATUSES.map((s) => (
-            <PressableScale
-              key={s}
-              accessibilityLabel={orderStatusLabel(s)}
-              onPress={() => {
-                if (saving) return;
-                onSelect(s);
-              }}
-              style={{
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderRadius: theme.radius.md,
-                borderWidth: 1,
-                borderColor: currentStatus === s ? theme.colors.primary : theme.colors.border,
-                backgroundColor:
-                  currentStatus === s
-                    ? theme.scheme === "light"
-                      ? "rgba(124,58,237,0.08)"
-                      : "rgba(124,58,237,0.18)"
-                    : theme.colors.background,
-              }}
-            >
-              <ThemedText variant="label" color="primary">
-                {orderStatusLabel(s)}
-              </ThemedText>
-            </PressableScale>
-          ))}
+          {ORDER_STATUSES.map((s) => {
+            const selected = currentStatus === s;
+            const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(s);
+
+            return (
+              <PressableScale
+                key={s}
+                accessibilityLabel={orderStatusLabel(s)}
+                onPress={() => {
+                  if (saving) return;
+                  onSelect(s);
+                }}
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: theme.radius.md,
+                  borderWidth: 1,
+                  borderColor: selected ? borderColor : theme.colors.border,
+                  backgroundColor: selected ? backgroundColor : theme.colors.background,
+                }}
+              >
+                <ThemedText
+                  variant="label"
+                  style={{ color: textColor, fontWeight: selected ? "600" : "500" }}
+                >
+                  {orderStatusLabel(s)}
+                </ThemedText>
+              </PressableScale>
+            );
+          })}
           <PressableScale
             accessibilityLabel="Close"
             onPress={onClose}

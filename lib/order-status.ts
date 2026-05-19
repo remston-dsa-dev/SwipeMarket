@@ -71,3 +71,17 @@ export function orderStatusColor(s: OrderStatus): string {
       return "#64748B";
   }
 }
+
+/** Shared badge colors for order header and line status chips (shopper + partner). */
+export function orderStatusBadgeStyle(status: OrderStatus): {
+  borderColor: string;
+  backgroundColor: string;
+  textColor: string;
+} {
+  const textColor = orderStatusColor(status);
+  return {
+    borderColor: textColor,
+    backgroundColor: `${textColor}18`,
+    textColor,
+  };
+}
