@@ -1,5 +1,4 @@
 import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -8,6 +7,7 @@ import { Image } from "expo-image";
 import { ProductListingTemplateModal } from "@/components/ProductListingTemplateModal";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { SupplierInventoryEmptyState } from "@/components/SupplierInventoryEmptyState";
+import { SupplierInventoryActions } from "@/components/SupplierInventoryActions";
 import { PressableScale } from "@/components/PressableScale";
 import { ProductRow } from "@/components/ProductRow";
 import { Screen } from "@/components/Screen";
@@ -28,7 +28,6 @@ import type { Product } from "@/types/product";
 import { useState } from "react";
 
 export default function SupplierDashboardScreen() {
-  const router = useRouter();
   const theme = useTheme();
   const queryClient = useQueryClient();
   const supplierId = useSessionStore((s) => s.userId);
@@ -223,96 +222,13 @@ export default function SupplierDashboardScreen() {
       </View>
 
       {!productsLoading && products.length > 0 ? (
-        <View style={{ gap: 10, marginBottom: 16 }}>
-          <PressableScale
-            accessibilityLabel="Add new product"
-            onPress={() => router.push("/(supplier)/add-product")}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              paddingVertical: 14,
-              borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.primary,
-            }}
-          >
-            <ThemedText variant="label" color="onPrimary">
-              + New Product
-            </ThemedText>
-          </PressableScale>
-
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <PressableScale
-              accessibilityLabel="Download product listing template as csv"
-              onPress={handleDownloadTemplateCsv}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: 12,
-                borderRadius: theme.radius.md,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              }}
-            >
-              <ThemedText variant="caption">Download .csv</ThemedText>
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel="Download product listing template as xlsx"
-              onPress={handleDownloadTemplateXlsx}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: 12,
-                borderRadius: theme.radius.md,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              }}
-            >
-              <ThemedText variant="caption">Download .xlsx</ThemedText>
-            </PressableScale>
-          </View>
-
-          <PressableScale
-            accessibilityLabel="Add your inventory from csv or xlsx file"
-            onPress={handleImportInventoryFile}
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 12,
-              borderRadius: theme.radius.md,
-              borderWidth: 1,
-              borderColor: theme.colors.primary,
-              backgroundColor: theme.colors.overlay,
-            }}
-          >
-            <ThemedText variant="caption" color="secondary">
-              Add your Inventory (.csv or .xlsx)
-            </ThemedText>
-          </PressableScale>
-
-          <PressableScale
-            accessibilityLabel="Review product listing template field reference"
-            onPress={() => setTemplateInfoOpen(true)}
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 12,
-              borderRadius: theme.radius.md,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.background,
-            }}
-          >
-            <ThemedText variant="caption" color="primary">
-              Review Product Listing Template
-            </ThemedText>
-          </PressableScale>
-        </View>
+        <SupplierInventoryActions
+          style={{ marginBottom: 16 }}
+          onImportInventoryFile={handleImportInventoryFile}
+          onDownloadTemplateCsv={handleDownloadTemplateCsv}
+          onDownloadTemplateXlsx={handleDownloadTemplateXlsx}
+          onReviewTemplate={() => setTemplateInfoOpen(true)}
+        />
       ) : null}
 
       {productsLoading ? (
@@ -322,7 +238,6 @@ export default function SupplierDashboardScreen() {
       ) : products.length === 0 ? (
         <View style={{ flex: 1, minHeight: 320 }}>
           <SupplierInventoryEmptyState
-            onAddProduct={() => router.push("/(supplier)/add-product")}
             onDownloadTemplateCsv={handleDownloadTemplateCsv}
             onDownloadTemplateXlsx={handleDownloadTemplateXlsx}
             onImportInventoryFile={handleImportInventoryFile}

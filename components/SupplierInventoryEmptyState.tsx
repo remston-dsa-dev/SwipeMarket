@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,15 +16,14 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { PressableScale } from "@/components/PressableScale";
+import { SupplierInventoryActions } from "./SupplierInventoryActions";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
-  onAddProduct: () => void;
+  onImportInventoryFile: () => void;
   onDownloadTemplateCsv: () => void;
   onDownloadTemplateXlsx: () => void;
-  onImportInventoryFile: () => void;
   onReviewTemplate: () => void;
 };
 
@@ -33,7 +31,7 @@ const COPY = {
   emoji: "📦",
   title: "Your shelf is ready",
   subtitle:
-    "Publish your first listing or import a .csv or .xlsx—when you go live, shoppers see it in Discover right away.",
+    "Import your full catalog from a .csv or .xlsx file—when you publish, shoppers see your products in Discover right away.",
 } as const;
 
 /**
@@ -41,7 +39,6 @@ const COPY = {
  * `DiscoverEmptyState` (hero ring, sparkles, gradient primary CTA, outline secondaries).
  */
 export function SupplierInventoryEmptyState({
-  onAddProduct,
   onDownloadTemplateCsv,
   onDownloadTemplateXlsx,
   onImportInventoryFile,
@@ -146,99 +143,13 @@ export function SupplierInventoryEmptyState({
       </Animated.View>
 
       <Animated.View entering={FadeInDown.duration(450).delay(200)} style={styles.actions}>
-        <PressableScale
-          accessibilityLabel="Add your first listing"
-          scaleOnPress={false}
-          onPress={onAddProduct}
-          style={styles.ctaShadow}
-        >
-          <LinearGradient
-            colors={[theme.colors.primary, theme.colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.ctaPrimary, styles.ctaWide]}
-          >
-            <Text style={styles.ctaEmoji}>✨</Text>
-            <ThemedText variant="label" color="onPrimary">
-              Add your first listing
-            </ThemedText>
-          </LinearGradient>
-        </PressableScale>
-
-        <View style={styles.templateRow}>
-          <PressableScale
-            accessibilityLabel="Download product listing template as csv"
-            scaleOnPress={false}
-            onPress={onDownloadTemplateCsv}
-            style={[
-              styles.ctaOutline,
-              styles.templateHalf,
-              {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-          >
-            <ThemedText variant="label" color="primary" numberOfLines={1}>
-              .csv
-            </ThemedText>
-          </PressableScale>
-          <PressableScale
-            accessibilityLabel="Download product listing template as xlsx"
-            scaleOnPress={false}
-            onPress={onDownloadTemplateXlsx}
-            style={[
-              styles.ctaOutline,
-              styles.templateHalf,
-              {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-              },
-            ]}
-          >
-            <ThemedText variant="label" color="primary" numberOfLines={1}>
-              .xlsx
-            </ThemedText>
-          </PressableScale>
-        </View>
-
-        <PressableScale
-          accessibilityLabel="Add your inventory from csv or xlsx spreadsheet"
-          scaleOnPress={false}
-          onPress={onImportInventoryFile}
-          style={[
-            styles.ctaOutline,
-            styles.ctaWide,
-            {
-              borderColor: theme.colors.primary,
-              backgroundColor: theme.colors.overlay,
-            },
-          ]}
-        >
-          <Text style={styles.ctaEmojiSmall}>📥</Text>
-          <ThemedText variant="label" color="secondary">
-            Add your Inventory (.csv or .xlsx)
-          </ThemedText>
-        </PressableScale>
-
-        <PressableScale
-          accessibilityLabel="Review product listing template columns and datatypes"
-          scaleOnPress={false}
-          onPress={onReviewTemplate}
-          style={[
-            styles.ctaOutline,
-            styles.ctaWide,
-            {
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.background,
-            },
-          ]}
-        >
-          <Text style={styles.ctaEmojiSmall}>📋</Text>
-          <ThemedText variant="label" color="primary" numberOfLines={2} style={{ textAlign: "center" }}>
-            Review Product Listing Template
-          </ThemedText>
-        </PressableScale>
+        <SupplierInventoryActions
+          defaultTemplateExpanded
+          onImportInventoryFile={onImportInventoryFile}
+          onDownloadTemplateCsv={onDownloadTemplateCsv}
+          onDownloadTemplateXlsx={onDownloadTemplateXlsx}
+          onReviewTemplate={onReviewTemplate}
+        />
       </Animated.View>
     </ScrollView>
   );
@@ -303,49 +214,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     width: "100%",
-    maxWidth: 400,
-    gap: 12,
     marginTop: 22,
     alignItems: "stretch",
   },
-  templateRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignSelf: "stretch",
-  },
-  templateHalf: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-  },
-  ctaShadow: {
-    borderRadius: 999,
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.26,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
-  ctaPrimary: {
-    borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  ctaOutline: {
-    borderRadius: 999,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1,
-  },
-  ctaWide: { alignSelf: "stretch" },
-  ctaEmoji: { fontSize: 18 },
-  ctaEmojiSmall: { fontSize: 16 },
 });
