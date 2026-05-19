@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { GlassSurface } from "@/components/GlassSurface";
+import { PartnerBadge } from "@/components/PartnerBadge";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/ThemeContext";
@@ -9,6 +10,11 @@ import type { Listing } from "@/types/listing";
 type Props = {
   listing: Listing | null;
   qty: number;
+  maxQty: number;
+  totalPoolUnits?: number;
+  partnerAvailableUnits?: number;
+  maxLineTotal?: number;
+  inCartQty?: number;
   onIncrement: () => void;
   onDecrement: () => void;
   onConfirm: () => void;
@@ -18,12 +24,21 @@ type Props = {
 export function QuantitySheet({
   listing,
   qty,
+  maxQty,
+  totalPoolUnits,
+  partnerAvailableUnits,
+  maxLineTotal,
+  inCartQty = 0,
   onIncrement,
   onDecrement,
   onConfirm,
   onCancel,
 }: Props) {
   const theme = useTheme();
+  const atMax = qty >= maxQty;
+  const pool = totalPoolUnits ?? listing?.totalAvailableUnits ?? 0;
+  const partner = partnerAvailableUnits ?? listing?.availableUnits ?? 0;
+  const maxTotal = maxLineTotal ?? pool;
 
   return (
     <Modal
@@ -46,14 +61,12 @@ export function QuantitySheet({
             },
           ]}
         >
-          {/* Handle */}
           <View
             style={[styles.handle, { backgroundColor: theme.colors.border }]}
           />
 
           {listing && (
             <>
-              {/* Product preview */}
               <GlassSurface
                 style={{ flexDirection: "row", gap: 14, padding: 14 }}
               >
@@ -67,7 +80,10 @@ export function QuantitySheet({
                   contentFit="cover"
                   accessibilityLabel={listing.title}
                 />
-                <View style={{ flex: 1, gap: 4, justifyContent: "center" }}>
+                <View style={{ flex: 1, gap: 6, justifyContent: "center" }}>
+                  {listing.supplier ? (
+                    <PartnerBadge partner={listing.supplier} compact />
+                  ) : null}
                   <ThemedText variant="headline">{listing.title}</ThemedText>
                   <ThemedText variant="label" color="secondary">
                     {listing.priceLabel} each
@@ -75,7 +91,21 @@ export function QuantitySheet({
                 </View>
               </GlassSurface>
 
-              {/* Qty row */}
+              <ThemedText variant="caption" color="secondary" style={{ textAlign: "center" }}>
+                {maxQty === 0
+                  ? "No units available across suppliers right now"
+                  : `${pool} total across suppliers · ${partner} from this partner`}
+              </ThemedText>
+              {maxQty > 0 ? (
+                <ThemedText variant="caption" color="muted" style={{ textAlign: "center" }}>
+                  {maxQty} available to add from this partner
+                  {pool > partner && maxQty < pool
+                    ? ` (${pool} total across suppliers — checkout fills other partners in order)`
+                    : ""}
+                  {inCartQty > 0 ? ` · ${inCartQty} in cart (max ${maxTotal} on this line)` : ""}
+                </ThemedText>
+              ) : null}
+
               <View style={styles.qtyRow}>
                 <PressableScale
                   accessibilityLabel="Decrease quantity"
@@ -115,25 +145,29 @@ export function QuantitySheet({
 
                 <PressableScale
                   accessibilityLabel="Increase quantity"
-                  onPress={onIncrement}
+                  onPress={() => {
+                    if (!atMax) onIncrement();
+                  }}
                   style={[
                     styles.qtyBtn,
                     {
-                      borderColor: theme.colors.primary,
+                      borderColor: atMax ? theme.colors.border : theme.colors.primary,
                       backgroundColor: theme.colors.surface,
+                      opacity: atMax ? 0.5 : 1,
                     },
                   ]}
                 >
                   <ThemedText
                     variant="headline"
-                    style={{ color: theme.colors.primary }}
+                    style={{
+                      color: atMax ? theme.colors.textSecondary : theme.colors.primary,
+                    }}
                   >
                     +
                   </ThemedText>
                 </PressableScale>
               </View>
 
-              {/* Subtotal hint */}
               <ThemedText
                 variant="caption"
                 color="muted"
@@ -143,13 +177,17 @@ export function QuantitySheet({
                 {`$${((listing.unitPriceCents * qty) / 100).toFixed(2)}`}
               </ThemedText>
 
-              {/* CTA */}
               <PressableScale
                 accessibilityLabel="Add to cart"
                 onPress={onConfirm}
+                disabled={maxQty === 0}
                 style={[
                   styles.ctaBtn,
-                  { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md },
+                  {
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: theme.radius.md,
+                    opacity: maxQty === 0 ? 0.45 : 1,
+                  },
                 ]}
               >
                 <ThemedText variant="label" color="onPrimary">

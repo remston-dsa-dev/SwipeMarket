@@ -1,5 +1,8 @@
 export type Product = {
   id: string;
+  supplierId?: string;
+  supplierName?: string | null;
+  supplierAvatarUrl?: string | null;
   title: string;
   description: string;
   priceLabel: string;
@@ -15,4 +18,7 @@ export type Product = {
   qtyAllocated?: number;
   /** Units reserved in shopper carts (server). */
   qtyOnHold?: number;
+  /** Generated: stock - qty_on_hold - qty_allocated */
+  availableUnits?: number;
+  catalogKey?: string;
 };

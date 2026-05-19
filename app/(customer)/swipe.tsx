@@ -33,6 +33,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useListings } from "@/hooks/useListings";
 import { fetchMyCartLines, setCartLineQtyRemote } from "@/lib/cart-remote";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { listingMaxAddQty, listingMaxLineTotal } from "@/lib/listing-inventory";
 import { useCartStore } from "@/stores/cart-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -179,8 +180,12 @@ export default function SwipeScreen() {
   // Stable ref-based opener — safe to capture once in the gesture worklet
   const openSheetForCurrent = useCallback(() => {
     const listing = listingsRef.current[indexRef.current];
-    if (listing) { setQty(1); setSheetListing(listing); }
-  }, []);
+    if (!listing) return;
+    const maxAdd = listingMaxAddQty(listing, cartItems, listingsRef.current);
+    if (maxAdd <= 0) return;
+    setQty(1);
+    setSheetListing(listing);
+  }, [cartItems]);
 
   const snapToLikePosition = useCallback(() => {
     translateX.value = withSpring(80);
@@ -249,8 +254,25 @@ export default function SwipeScreen() {
     };
   });
 
+  const sheetInCartQty =
+    sheetListing == null
+      ? 0
+      : cartItems.find((i) => i.listingId === sheetListing.id)?.qty ?? 0;
+  const sheetMaxAddQty = sheetListing
+    ? listingMaxAddQty(sheetListing, cartItems, listings)
+    : 0;
+  const sheetMaxLineTotal = sheetListing
+    ? listingMaxLineTotal(sheetListing, cartItems, listings)
+    : 0;
+
   async function handleConfirm() {
     if (!sheetListing) return;
+    const maxAdd = listingMaxAddQty(sheetListing, cartItems, listings);
+    const addQty = Math.min(qty, maxAdd);
+    if (addQty <= 0) {
+      Alert.alert("Not available", "This product has no units left to reserve.");
+      return;
+    }
     if (!isSupabaseConfigured()) {
       addItem(
         {
@@ -260,7 +282,7 @@ export default function SwipeScreen() {
           imageUrl: sheetListing.imageUrl,
           unitPriceCents: sheetListing.unitPriceCents,
         },
-        qty,
+        addQty,
       );
       setSheetListing(null);
       dismissRight();
@@ -269,7 +291,15 @@ export default function SwipeScreen() {
     try {
       const existing =
         useCartStore.getState().items.find((i) => i.listingId === sheetListing.id)?.qty ?? 0;
-      await setCartLineQtyRemote(sheetListing.id, existing + qty);
+      const nextTotal = existing + addQty;
+      if (nextTotal > sheetMaxLineTotal) {
+        Alert.alert(
+          "Not available",
+          `You can reserve up to ${sheetMaxLineTotal} on this partner's listing. Swipe the same product from another partner or lower the quantity.`,
+        );
+        return;
+      }
+      await setCartLineQtyRemote(sheetListing.id, nextTotal);
       const lines = await fetchMyCartLines();
       useCartStore.getState().replaceFromServer(lines);
       void queryClient.invalidateQueries({ queryKey: ["listings"] });
@@ -483,7 +513,14 @@ export default function SwipeScreen() {
       <QuantitySheet
         listing={sheetListing}
         qty={qty}
-        onIncrement={() => setQty((q) => q + 1)}
+        maxQty={sheetMaxAddQty}
+        totalPoolUnits={sheetListing?.totalAvailableUnits}
+        partnerAvailableUnits={sheetListing?.availableUnits}
+        inCartQty={sheetInCartQty}
+        maxLineTotal={sheetMaxLineTotal}
+        onIncrement={() =>
+          setQty((q) => Math.min(q + 1, sheetMaxAddQty || 1))
+        }
         onDecrement={() => setQty((q) => Math.max(1, q - 1))}
         onConfirm={handleConfirm}
         onCancel={handleSkip}

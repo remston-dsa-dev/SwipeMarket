@@ -2,20 +2,27 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
-import { productToListing, rowToProduct } from "@/lib/product-map";
+import { productToListing, rowToProduct, withCatalogPools } from "@/lib/product-map";
 import { supabase } from "@/lib/supabase";
 import type { Listing } from "@/types/listing";
 
 async function fetchListings(): Promise<Listing[]> {
   const { data, error } = await supabase
     .from("products")
-    .select("*")
+    .select(
+      `
+      *,
+      supplier:profiles!products_supplier_id_fkey(id, full_name, avatar_url)
+    `,
+    )
     .eq("published", true)
     .gt("available_units", 0)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []).map((row) => productToListing(rowToProduct(row)));
+
+  const listings = (data ?? []).map((row) => productToListing(rowToProduct(row)));
+  return withCatalogPools(listings);
 }
 
 export function useListings() {

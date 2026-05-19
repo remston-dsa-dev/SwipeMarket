@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import type { StyleProp, ViewStyle } from "react-native";
 import { View } from "react-native";
 import { GlassSurface } from "@/components/GlassSurface";
+import { PartnerBadge } from "@/components/PartnerBadge";
 import { ThemedText } from "@/components/ThemedText";
 import type { Listing } from "@/types/listing";
 import { useTheme } from "@/theme/ThemeContext";
@@ -16,20 +17,35 @@ export function ListingCard({ listing, style }: Props) {
   return (
     <View style={[{ width: "100%", height: 500 }, style]}>
       <GlassSurface style={{ flex: 1 }}>
-        <Image
-          source={{ uri: listing.imageUrl }}
-          cachePolicy="memory-disk"
-          recyclingKey={listing.id}
-          transition={0}
-          style={{
-            width: "100%",
-            height: 340,
-            borderTopLeftRadius: theme.radius.md - 1,
-            borderTopRightRadius: theme.radius.md - 1,
-          }}
-          contentFit="cover"
-          accessibilityLabel={listing.title}
-        />
+        <View style={{ position: "relative" }}>
+          <Image
+            source={{ uri: listing.imageUrl }}
+            cachePolicy="memory-disk"
+            recyclingKey={listing.id}
+            transition={0}
+            style={{
+              width: "100%",
+              height: 340,
+              borderTopLeftRadius: theme.radius.md - 1,
+              borderTopRightRadius: theme.radius.md - 1,
+            }}
+            contentFit="cover"
+            accessibilityLabel={listing.title}
+          />
+          {listing.supplier ? (
+            <View
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                right: 12,
+              }}
+              pointerEvents="none"
+            >
+              <PartnerBadge partner={listing.supplier} />
+            </View>
+          ) : null}
+        </View>
         <View
           style={{
             padding: 16,

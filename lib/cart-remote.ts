@@ -32,12 +32,29 @@ export async function setCartLineQtyRemote(productId: string, qty: number): Prom
     p_product_id: productId,
     p_qty: qty,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(cartInventoryErrorMessage(error.message));
+}
+
+function cartInventoryErrorMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("not enough units available from this partner")) {
+    return "This partner only has that many units in stock. Lower the quantity or swipe the same product from another partner.";
+  }
+  if (lower.includes("not enough units available across suppliers")) {
+    return "Not enough units are available across all suppliers for this product.";
+  }
+  if (lower.includes("products_stock_covers_hold_and_allocated")) {
+    return "This partner cannot hold that many units. Lower the quantity — checkout can fill the rest from other partners in order.";
+  }
+  if (lower.includes("not enough units available for checkout")) {
+    return "Not enough inventory is available to complete checkout. Reduce quantities or remove items and try again.";
+  }
+  return message;
 }
 
 export async function checkoutCartRemote(): Promise<void> {
   const { error } = await supabase.rpc("checkout_cart");
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(cartInventoryErrorMessage(error.message));
 }
 
 /** Removes all server cart rows for the signed-in user (e.g. before sign-out). */

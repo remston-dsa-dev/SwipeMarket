@@ -53,6 +53,7 @@ export type Database = {
           unit: string | null;
           qty_allocated: number;
           qty_on_hold: number;
+          catalog_key: string;
           /** Generated: stock - qty_on_hold - qty_allocated */
           available_units: number;
           published: boolean;
@@ -76,6 +77,7 @@ export type Database = {
           unit?: string | null;
           qty_allocated?: number;
           qty_on_hold?: number;
+          catalog_key?: string;
           published?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -95,6 +97,7 @@ export type Database = {
           unit?: string | null;
           qty_allocated?: number;
           qty_on_hold?: number;
+          catalog_key?: string;
           published?: boolean;
           updated_at?: string;
         };
