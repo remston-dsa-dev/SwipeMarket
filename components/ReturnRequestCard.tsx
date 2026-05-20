@@ -4,11 +4,10 @@ import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import type { ReturnRequestRow } from "@/hooks/useReturnRequests";
-import {
-  formatRefundCents,
-  returnRequestStatusLabel,
-  returnResolutionLabel,
-} from "@/lib/return-resolution";
+import { ReturnDispositionSummary } from "@/components/return-resolution/ReturnDispositionSummary";
+import { DispositionChip } from "@/components/return-resolution/DispositionChip";
+import { pendingChipStyle } from "@/components/return-resolution/disposition-chip-styles";
+import { returnRequestStatusLabel } from "@/lib/return-resolution";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
@@ -36,6 +35,8 @@ export function ReturnRequestCard({
     hour: "numeric",
     minute: "2-digit",
   });
+
+  const isDark = theme.scheme === "dark";
 
   const party =
     role === "customer"
@@ -69,6 +70,9 @@ export function ReturnRequestCard({
         )}
         <View
           style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
             paddingHorizontal: 10,
             paddingVertical: 5,
             borderRadius: theme.radius.pill,
@@ -77,6 +81,9 @@ export function ReturnRequestCard({
             borderColor: theme.colors.border,
           }}
         >
+          {request.status === "requested" ? (
+            <DispositionChip style={pendingChipStyle(isDark)} />
+          ) : null}
           <ThemedText variant="caption" style={{ fontWeight: "600" }}>
             {returnRequestStatusLabel(request.status)}
           </ThemedText>
@@ -116,26 +123,18 @@ export function ReturnRequestCard({
             padding: 10,
             borderRadius: theme.radius.sm,
             backgroundColor: theme.colors.overlay,
-            gap: 4,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
           }}
         >
-          <ThemedText variant="caption" style={{ fontWeight: "600" }}>
-            {returnResolutionLabel(request.resolution)}
-          </ThemedText>
-          {request.refund_kind !== "none" ? (
-            <ThemedText variant="caption" color="secondary">
-              Refund: {formatRefundCents(request.refund_cents)}
-            </ThemedText>
-          ) : (
-            <ThemedText variant="caption" color="muted">
-              No refund issued
-            </ThemedText>
-          )}
-          {request.supplier_note ? (
-            <ThemedText variant="caption" color="muted">
-              Note: {request.supplier_note}
-            </ThemedText>
-          ) : null}
+          <ReturnDispositionSummary
+            status="resolved"
+            resolution={request.resolution}
+            returnAccepted={request.return_accepted}
+            refundKind={request.refund_kind}
+            refundCents={request.refund_cents}
+            subtitle={request.supplier_note ? `Note: ${request.supplier_note}` : undefined}
+          />
         </View>
       ) : null}
 

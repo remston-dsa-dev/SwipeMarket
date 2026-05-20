@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View } from "react-native";
 import { Image } from "expo-image";
 import { PressableScale } from "@/components/PressableScale";
@@ -7,7 +8,8 @@ import {
   linePendingReturnQty,
   type OrderLineFields,
 } from "@/lib/order-line";
-import { returnResolutionLabel, type ReturnResolution } from "@/lib/return-resolution";
+import { ReturnDispositionSummary } from "@/components/return-resolution/ReturnDispositionSummary";
+import type { ReturnResolution } from "@/lib/return-resolution";
 import { orderStatusBadgeStyle, orderStatusColor, orderStatusLabel } from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -20,14 +22,16 @@ export type OrderLineDisplay = OrderLineFields & {
 
 type Props = {
   line: OrderLineDisplay;
+  warrantyNow?: number;
   onStatusPress?: () => void;
   statusBusy?: boolean;
   onRequestReturn?: () => void;
   returnBusy?: boolean;
 };
 
-export function OrderLineRow({
+export const OrderLineRow = memo(function OrderLineRow({
   line,
+  warrantyNow = Date.now(),
   onStatusPress,
   statusBusy,
   onRequestReturn,
@@ -58,15 +62,20 @@ export function OrderLineRow({
           {!shopperReturns ? (
             <>
               {pendingQty > 0 ? (
-                <ThemedText variant="caption" style={{ color: "#D97706" }}>
-                  Return pending review · {pendingQty} unit{pendingQty === 1 ? "" : "s"}
-                </ThemedText>
+                <ReturnDispositionSummary
+                  status="requested"
+                  subtitle={`${pendingQty} unit${pendingQty === 1 ? "" : "s"} awaiting review`}
+                />
               ) : null}
               {resolvedReturns.slice(-1).map((r) => (
-                <ThemedText key={r.id} variant="caption" color="muted" numberOfLines={1}>
-                  {returnResolutionLabel(r.resolution as ReturnResolution)}
-                  {r.refund_kind !== "none" ? ` · $${(r.refund_cents / 100).toFixed(2)} refund` : ""}
-                </ThemedText>
+                <ReturnDispositionSummary
+                  key={r.id}
+                  status="resolved"
+                  resolution={r.resolution as ReturnResolution}
+                  returnAccepted={r.return_accepted}
+                  refundKind={r.refund_kind}
+                  refundCents={r.refund_cents}
+                />
               ))}
             </>
           ) : null}
@@ -87,16 +96,17 @@ export function OrderLineRow({
       </View>
 
       {shopperReturns ? (
-        <OrderLineReturnFold
-          line={line}
-          productTitle={line.title}
-          onRequestReturn={onRequestReturn}
-          returnBusy={returnBusy}
-        />
+          <OrderLineReturnFold
+            line={line}
+            productTitle={line.title}
+            warrantyNow={warrantyNow}
+            onRequestReturn={onRequestReturn}
+            returnBusy={returnBusy}
+          />
       ) : null}
     </View>
   );
-}
+});
 
 function LineStatusBadge({
   status,

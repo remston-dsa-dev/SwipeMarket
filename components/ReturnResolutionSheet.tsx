@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
+import { ReturnPaymentDispositionLabels } from "@/components/return-resolution/ReturnPaymentDispositionLabels";
 import { ThemedText } from "@/components/ThemedText";
 import {
   SUPPLIER_RETURN_RESOLUTIONS,
@@ -102,16 +103,24 @@ export function ReturnResolutionSheet({
                   borderRadius: theme.radius.md,
                   borderWidth: 1,
                   borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                  backgroundColor: isSelected ? theme.colors.overlay : theme.colors.background,
-                  gap: 4,
+                  backgroundColor: isSelected
+                    ? theme.scheme === "light"
+                      ? "rgba(124,58,237,0.06)"
+                      : "rgba(124,58,237,0.14)"
+                    : theme.colors.background,
+                  gap: 8,
                 }}
               >
-                <ThemedText variant="label" style={{ fontWeight: isSelected ? "700" : "500" }}>
-                  {opt.label}
-                </ThemedText>
-                <ThemedText variant="caption" color="muted">
-                  {opt.description}
-                </ThemedText>
+                <View style={{ alignSelf: "stretch", width: "100%", gap: 6 }}>
+                  <ReturnPaymentDispositionLabels
+                    returnAccepted={opt.returnAccepted}
+                    refundKind={opt.refundKind}
+                    lineTotalCents={lineTotalCents}
+                  />
+                  <ThemedText variant="caption" color="muted" style={{ lineHeight: 18 }}>
+                    {opt.description}
+                  </ThemedText>
+                </View>
               </PressableScale>
             );
           })}

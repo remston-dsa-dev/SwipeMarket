@@ -63,9 +63,76 @@ export const SUPPLIER_RETURN_RESOLUTIONS: {
   },
 ];
 
+export function getResolutionDisposition(
+  resolution: ReturnResolution | string,
+  fallback?: { returnAccepted: boolean | null; refundKind: string },
+): { returnAccepted: boolean; refundKind: RefundKind } | null {
+  const match = SUPPLIER_RETURN_RESOLUTIONS.find((r) => r.value === resolution);
+  if (match) {
+    return { returnAccepted: match.returnAccepted, refundKind: match.refundKind };
+  }
+  const key = String(resolution);
+  if (key.startsWith("accept_")) {
+    const kind = key.includes("partial")
+      ? "partial"
+      : key.includes("no_refund")
+        ? "none"
+        : "full";
+    return { returnAccepted: true, refundKind: kind };
+  }
+  if (key.startsWith("deny_")) {
+    const kind = key.includes("partial")
+      ? "partial"
+      : key.includes("no_refund")
+        ? "none"
+        : "full";
+    return { returnAccepted: false, refundKind: kind };
+  }
+  if (fallback?.returnAccepted != null) {
+    const kind = fallback.refundKind as RefundKind;
+    if (kind === "none" || kind === "partial" || kind === "full") {
+      return { returnAccepted: fallback.returnAccepted, refundKind: kind };
+    }
+  }
+  return null;
+}
+
+export function returnDispositionText(returnAccepted: boolean): string {
+  return returnAccepted ? "Return accepted" : "Return denied";
+}
+
+export function refundDispositionText(kind: RefundKind): string {
+  switch (kind) {
+    case "full":
+      return "Full refund";
+    case "partial":
+      return "Partial refund";
+    case "none":
+    default:
+      return "No refund";
+  }
+}
+
+/** Refund line copy: dollar amount when known, otherwise short hint for resolve options. */
+export function refundDisplayText(
+  kind: RefundKind,
+  refundCents = 0,
+  lineTotalCents?: number,
+): string {
+  if (kind === "none") return "No refund";
+  if (refundCents > 0) return `${formatRefundCents(refundCents)} refund`;
+  if (kind === "full" && lineTotalCents != null && lineTotalCents > 0) {
+    return `${formatRefundCents(lineTotalCents)} refund`;
+  }
+  if (kind === "partial") return "Custom refund";
+  return "No refund";
+}
+
 export function returnResolutionLabel(resolution: ReturnResolution): string {
   const match = SUPPLIER_RETURN_RESOLUTIONS.find((r) => r.value === resolution);
-  if (match) return match.label;
+  if (match) {
+    return `${returnDispositionText(match.returnAccepted)} · ${refundDispositionText(match.refundKind)}`;
+  }
   if (resolution === "pending") return "Pending review";
   return resolution;
 }

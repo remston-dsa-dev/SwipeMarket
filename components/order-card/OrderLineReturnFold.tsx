@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { useReturnWarrantyNow } from "@/hooks/useReturnWarrantyClock";
 import {
   formatReturnWarrantyExpiresAt,
   formatReturnWarrantyRemaining,
@@ -14,17 +13,26 @@ import {
   RETURN_WARRANTY_DAYS,
   type OrderLineFields,
 } from "@/lib/order-line";
+import { DispositionChip } from "@/components/return-resolution/DispositionChip";
+import { ReturnDispositionSummary } from "@/components/return-resolution/ReturnDispositionSummary";
+import { ReturnPaymentDispositionLabels } from "@/components/return-resolution/ReturnPaymentDispositionLabels";
+import { pendingChipStyle } from "@/components/return-resolution/disposition-chip-styles";
 import {
-  formatRefundCents,
+  getResolutionDisposition,
+  refundDisplayText,
   returnResolutionLabel,
+  type RefundKind,
   type ReturnResolution,
 } from "@/lib/return-resolution";
 import { STATUS_SUCCESS, STATUS_WARNING } from "@/lib/status-colors";
 import { useTheme } from "@/theme/ThemeContext";
+import type { LineReturnRequestSummary } from "@/lib/order-line";
 
 type Props = {
   line: OrderLineFields;
   productTitle: string;
+  /** Shared screen clock — do not run a per-row timer in lists. */
+  warrantyNow: number;
   onRequestReturn?: () => void;
   returnBusy?: boolean;
 };
@@ -71,12 +79,10 @@ function getFoldState(line: OrderLineFields, now: number): FoldState | null {
   }
 
   if (last) {
-    const refund =
-      last.refund_kind !== "none" ? ` · ${formatRefundCents(last.refund_cents)} refund` : "";
     return {
       tone: "resolved",
       icon: "checkmark-circle",
-      primary: `${returnResolutionLabel(last.resolution as ReturnResolution)}${refund}`,
+      primary: returnResolutionLabel(last.resolution as ReturnResolution),
       secondary: new Date(last.created_at).toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
@@ -117,23 +123,50 @@ function hasReturnSection(line: OrderLineFields, now: number): boolean {
 
 function ActivityRow({ children }: { children: ReactNode }) {
   return (
-    <View style={{ paddingLeft: 22 }}>
-      <ThemedText variant="caption" color="muted" style={{ lineHeight: 17 }}>
-        {children}
-      </ThemedText>
+    <View style={{ paddingLeft: 0 }}>
+      {typeof children === "string" ? (
+        <ThemedText variant="caption" color="muted" style={{ lineHeight: 17 }}>
+          {children}
+        </ThemedText>
+      ) : (
+        children
+      )}
     </View>
+  );
+}
+
+function FoldLeadingIcon({
+  tone,
+  isDark,
+  iconColor,
+  foldIcon,
+}: {
+  tone: FoldTone;
+  isDark: boolean;
+  iconColor: string;
+  foldIcon: ComponentProps<typeof Ionicons>["name"];
+}) {
+  if (tone === "pending") {
+    return <DispositionChip style={pendingChipStyle(isDark)} />;
+  }
+  if (tone === "resolved") {
+    return null;
+  }
+  return (
+    <Ionicons name={foldIcon} size={15} color={iconColor} style={{ marginTop: 1, flexShrink: 0 }} />
   );
 }
 
 export function OrderLineReturnFold({
   line,
   productTitle,
+  warrantyNow,
   onRequestReturn,
   returnBusy,
 }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const now = useReturnWarrantyNow(line.shipped_at);
+  const now = warrantyNow;
 
   const warranty = useMemo(
     () => getReturnWarrantySnapshot(line.shipped_at, now),
@@ -144,7 +177,15 @@ export function OrderLineReturnFold({
   const eligible = isLineReturnEligible(line, now);
   const pendingQty = linePendingReturnQty(line);
   const resolvedReturns = (line.return_requests ?? []).filter((r) => r.status === "resolved");
+  const lastResolved = resolvedReturns[resolvedReturns.length - 1];
+  const resolvedDisposition = lastResolved
+    ? getResolutionDisposition(lastResolved.resolution as ReturnResolution, {
+        returnAccepted: lastResolved.return_accepted,
+        refundKind: lastResolved.refund_kind,
+      })
+    : null;
   const iconColor = fold ? toneIconColor(theme, fold.tone) : theme.colors.textSecondary;
+  const isDark = theme.scheme === "dark";
 
   if (!show || !fold) return null;
 
@@ -176,27 +217,46 @@ export function OrderLineReturnFold({
           paddingVertical: 6,
         }}
       >
-        <Ionicons
-          name={fold.icon}
-          size={15}
-          color={iconColor}
-          style={{ marginTop: 1, flexShrink: 0 }}
-        />
+        {fold.tone !== "resolved" ? (
+          <FoldLeadingIcon
+            tone={fold.tone}
+            isDark={isDark}
+            iconColor={iconColor}
+            foldIcon={fold.icon}
+          />
+        ) : null}
 
         <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
-          <ThemedText
-            variant="caption"
-            color="secondary"
-            numberOfLines={3}
-            style={{ fontWeight: "600", lineHeight: 17 }}
-          >
-            {fold.primary}
-          </ThemedText>
-          {fold.secondary ? (
-            <ThemedText variant="caption" color="muted" numberOfLines={2} style={{ lineHeight: 16 }}>
-              {fold.secondary}
+          {fold.tone === "resolved" && resolvedDisposition && lastResolved ? (
+            <ReturnPaymentDispositionLabels
+              returnAccepted={resolvedDisposition.returnAccepted}
+              refundKind={resolvedDisposition.refundKind}
+              refundCents={lastResolved.refund_cents}
+            />
+          ) : fold.tone === "resolved" && lastResolved ? (
+            <ThemedText variant="caption" color="secondary" style={{ fontWeight: "600", lineHeight: 17 }}>
+              {returnResolutionLabel(lastResolved.resolution as ReturnResolution)}
+              {lastResolved.refund_kind !== "none" && lastResolved.refund_cents > 0
+                ? ` · ${refundDisplayText(lastResolved.refund_kind as RefundKind, lastResolved.refund_cents)}`
+                : ""}
             </ThemedText>
-          ) : null}
+          ) : (
+            <>
+              <ThemedText
+                variant="caption"
+                color="secondary"
+                numberOfLines={3}
+                style={{ fontWeight: "600", lineHeight: 17 }}
+              >
+                {fold.primary}
+              </ThemedText>
+              {fold.secondary ? (
+                <ThemedText variant="caption" color="muted" numberOfLines={2} style={{ lineHeight: 16 }}>
+                  {fold.secondary}
+                </ThemedText>
+              ) : null}
+            </>
+          )}
         </View>
 
         <Ionicons
@@ -211,8 +271,10 @@ export function OrderLineReturnFold({
         <View style={{ gap: 8, paddingBottom: 2, paddingLeft: 23 }}>
           {eligible && warranty && !warranty.windowEnded ? (
             <ActivityRow>
-              {formatReturnWarrantyRemaining(warranty)} remaining (updates live). Window ends{" "}
-              {formatReturnWarrantyExpiresAt(warranty.expiresAtMs)}.
+              <ThemedText variant="caption" color="muted" style={{ lineHeight: 17 }}>
+                {formatReturnWarrantyRemaining(warranty)} remaining (updates live). Window ends{" "}
+                {formatReturnWarrantyExpiresAt(warranty.expiresAtMs)}.
+              </ThemedText>
             </ActivityRow>
           ) : null}
 
@@ -224,10 +286,14 @@ export function OrderLineReturnFold({
                 });
                 return (
                   <ActivityRow key={r.id}>
-                    {returnResolutionLabel(r.resolution as ReturnResolution)}
-                    {r.refund_kind !== "none" ? ` · ${formatRefundCents(r.refund_cents)}` : ""}
-                    {" · "}
-                    {when}
+                    <ReturnDispositionSummary
+                      status="resolved"
+                      resolution={r.resolution}
+                      returnAccepted={r.return_accepted}
+                      refundKind={r.refund_kind}
+                      refundCents={r.refund_cents}
+                      subtitle={when}
+                    />
                   </ActivityRow>
                 );
               })
@@ -265,6 +331,14 @@ export function OrderLineReturnFold({
                 {returnBusy ? "Submitting…" : "Request return / refund"}
               </ThemedText>
             </PressableScale>
+          ) : null}
+
+          {fold.tone === "resolved" && fold.secondary ? (
+            <ActivityRow>
+              <ThemedText variant="caption" color="muted" style={{ lineHeight: 16 }}>
+                Resolved {fold.secondary}
+              </ThemedText>
+            </ActivityRow>
           ) : null}
 
           {fold.tone === "ended" ? (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { ShopperOrderCard } from "@/components/ShopperOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
+import { useSharedReturnWarrantyNow } from "@/hooks/useReturnWarrantyClock";
 import { useCustomerOrders, type CustomerOrder, type CustomerOrderItem } from "@/hooks/useCustomerOrders";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { isLineReturnEligible } from "@/lib/order-line";
@@ -21,6 +22,10 @@ function partnerLabel(order: CustomerOrder): string {
   return `Partner · ${order.supplier_id.slice(0, 8)}…`;
 }
 
+type OrderListRow =
+  | { key: string; kind: "header"; title: string }
+  | { key: string; kind: "order"; order: CustomerOrder };
+
 export default function CustomerOrdersScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -30,6 +35,80 @@ export default function CustomerOrdersScreen() {
   const [returnLine, setReturnLine] = useState<CustomerOrderItem | null>(null);
   const [returnSaving, setReturnSaving] = useState(false);
   const [returnBusyLineId, setReturnBusyLineId] = useState<string | null>(null);
+
+  const warrantyLines = useMemo(
+    () => orders.flatMap((o) => o.order_items),
+    [orders],
+  );
+
+  const needsWarrantyClock = useMemo(
+    () => warrantyLines.some((l) => l.status === "delivered" && l.shipped_at),
+    [warrantyLines],
+  );
+
+  const warrantyNow = useSharedReturnWarrantyNow(warrantyLines, needsWarrantyClock);
+
+  const listRows = useMemo((): OrderListRow[] => {
+    const bySupplier = new Map<string, CustomerOrder[]>();
+    for (const o of orders) {
+      const list = bySupplier.get(o.supplier_id) ?? [];
+      list.push(o);
+      bySupplier.set(o.supplier_id, list);
+    }
+    const sections = Array.from(bySupplier.entries())
+      .map(([supplierId, list]) => ({
+        supplierId,
+        title: partnerLabel(list[0]!),
+        data: [...list].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.data[0]!.created_at).getTime() - new Date(a.data[0]!.created_at).getTime(),
+      );
+
+    const rows: OrderListRow[] = [];
+    for (const section of sections) {
+      rows.push({ key: `h-${section.supplierId}`, kind: "header", title: section.title });
+      for (const order of section.data) {
+        rows.push({ key: order.id, kind: "order", order });
+      }
+    }
+    return rows;
+  }, [orders]);
+
+  const handleRequestReturn = useCallback((line: CustomerOrderItem) => {
+    if (!isLineReturnEligible(line)) {
+      Alert.alert(
+        "Return window ended",
+        "The 30-day return period for this item has passed.",
+      );
+      return;
+    }
+    setReturnLine(line);
+  }, []);
+
+  const renderRow = useCallback(
+    ({ item }: { item: OrderListRow }) => {
+      if (item.kind === "header") {
+        return (
+          <ThemedText variant="label" color="secondary" style={{ marginBottom: 12 }}>
+            {item.title}
+          </ThemedText>
+        );
+      }
+      return (
+        <ShopperOrderCard
+          order={item.order}
+          warrantyNow={warrantyNow}
+          returnBusyLineId={returnBusyLineId}
+          onRequestReturn={handleRequestReturn}
+        />
+      );
+    },
+    [warrantyNow, returnBusyLineId, handleRequestReturn],
+  );
 
   async function submitReturn(qty: number, reason: string) {
     if (!returnLine || !customerId) return;
@@ -53,27 +132,6 @@ export default function CustomerOrdersScreen() {
       setReturnBusyLineId(null);
     }
   }
-
-  const sections = useMemo(() => {
-    const bySupplier = new Map<string, CustomerOrder[]>();
-    for (const o of orders) {
-      const list = bySupplier.get(o.supplier_id) ?? [];
-      list.push(o);
-      bySupplier.set(o.supplier_id, list);
-    }
-    return Array.from(bySupplier.entries())
-      .map(([supplierId, list]) => ({
-        supplierId,
-        title: partnerLabel(list[0]!),
-        data: [...list].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        ),
-      }))
-      .sort(
-        (a, b) =>
-          new Date(b.data[0]!.created_at).getTime() - new Date(a.data[0]!.created_at).getTime(),
-      );
-  }, [orders]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -146,34 +204,15 @@ export default function CustomerOrdersScreen() {
         </View>
       ) : (
         <FlatList
-          data={sections}
-          keyExtractor={(s) => s.supplierId}
+          data={listRows}
+          keyExtractor={(row) => row.key}
+          renderItem={renderRow}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 24, paddingBottom: 32 }}
-          renderItem={({ item: section }) => (
-            <View style={{ gap: 12 }}>
-              <ThemedText variant="label" color="secondary">
-                {section.title}
-              </ThemedText>
-              {section.data.map((order) => (
-                <ShopperOrderCard
-                  key={order.id}
-                  order={order}
-                  returnBusyLineId={returnBusyLineId}
-                  onRequestReturn={(line) => {
-                    if (!isLineReturnEligible(line)) {
-                      Alert.alert(
-                        "Return window ended",
-                        "The 30-day return period for this item has passed.",
-                      );
-                      return;
-                    }
-                    setReturnLine(line);
-                  }}
-                />
-              ))}
-            </View>
-          )}
+          removeClippedSubviews
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          windowSize={8}
+          contentContainerStyle={{ gap: 12, paddingBottom: 32 }}
         />
       )}
       <ReturnRequestSheet
@@ -189,4 +228,3 @@ export default function CustomerOrdersScreen() {
     </Screen>
   );
 }
-

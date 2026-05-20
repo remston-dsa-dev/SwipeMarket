@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { View } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
@@ -17,11 +17,17 @@ import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   order: CustomerOrder;
+  warrantyNow: number;
   onRequestReturn?: (line: CustomerOrder["order_items"][number]) => void;
   returnBusyLineId?: string | null;
 };
 
-export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: Props) {
+export const ShopperOrderCard = memo(function ShopperOrderCard({
+  order,
+  warrantyNow,
+  onRequestReturn,
+  returnBusyLineId,
+}: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
 
@@ -87,7 +93,10 @@ export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: P
           <OrderLineRow
             key={line.id}
             line={line}
-            onRequestReturn={onRequestReturn ? () => onRequestReturn(line) : undefined}
+            warrantyNow={warrantyNow}
+            onRequestReturn={
+              onRequestReturn ? () => onRequestReturn(line) : undefined
+            }
             returnBusy={returnBusyLineId === line.id}
           />
         ))}
@@ -110,4 +119,4 @@ export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: P
       )}
     </View>
   );
-}
+});
