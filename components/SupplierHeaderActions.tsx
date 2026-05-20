@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
+import { useSupplierReturns } from "@/hooks/useReturnRequests";
 import { useSupplierOrders } from "@/hooks/useSupplierOrders";
 import { useSupplierProducts } from "@/hooks/useSupplierProducts";
 import { signOutApp } from "@/lib/sign-out";
@@ -83,16 +84,17 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
   const supplierId = useSessionStore((s) => s.userId);
   const { data: orders = [] } = useSupplierOrders(supplierId);
   const { data: products = [] } = useSupplierProducts(supplierId);
+  const { data: returns = [] } = useSupplierReturns(supplierId);
 
   const menuCounts = useMemo(
     (): Record<MenuKey, number> => ({
       dashboard: products.length,
       addProduct: 0,
       orders: orders.length,
-      returns: 0,
+      returns: returns.filter((r) => r.status === "requested").length,
       more: 0,
     }),
-    [orders.length, products.length],
+    [orders.length, products.length, returns],
   );
 
   const activeKey = useMemo((): MenuKey | null => {

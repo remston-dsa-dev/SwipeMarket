@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { normalizeOrderStatus, type OrderStatus } from "@/lib/order-status";
-import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
 import { supabase } from "@/lib/supabase";
+
+import type { LineReturnRequestSummary } from "@/lib/order-line";
 
 export type SupplierOrderItem = {
   id: string;
@@ -15,6 +15,7 @@ export type SupplierOrderItem = {
   unit_price_cents: number;
   title: string;
   image_url: string;
+  return_requests: LineReturnRequestSummary[];
 };
 
 export type SupplierOrder = {
@@ -23,7 +24,7 @@ export type SupplierOrder = {
   status: OrderStatus;
   total_cents: number;
   created_at: string;
-  customer: { full_name: string | null } | null;
+  customer: { full_name: string | null; avatar_url: string | null } | null;
   order_items: SupplierOrderItem[];
 };
 
@@ -37,8 +38,30 @@ async function fetchSupplierOrders(supplierId: string): Promise<SupplierOrder[]>
       status,
       total_cents,
       created_at,
-      customer:profiles!orders_customer_id_fkey(full_name),
-      order_items(id, product_id, qty, return_qty, status, shipped_at, unit_price_cents, title, image_url)
+      customer:profiles!orders_customer_id_fkey(full_name, avatar_url),
+      order_items(
+        id,
+        product_id,
+        qty,
+        return_qty,
+        status,
+        shipped_at,
+        unit_price_cents,
+        title,
+        image_url,
+        return_requests(
+          id,
+          qty,
+          reason,
+          status,
+          resolution,
+          refund_kind,
+          refund_cents,
+          return_accepted,
+          created_at,
+          customer:profiles!return_requests_customer_id_fkey(full_name, avatar_url)
+        )
+      )
     `,
     )
     .eq("supplier_id", supplierId)
@@ -47,16 +70,34 @@ async function fetchSupplierOrders(supplierId: string): Promise<SupplierOrder[]>
   if (error) throw error;
 
   return (data ?? []).map((row) => {
-    const customer = row.customer as { full_name: string | null } | { full_name: string | null }[] | null;
+    const customer = row.customer as
+      | { full_name: string | null; avatar_url: string | null }
+      | { full_name: string | null; avatar_url: string | null }[]
+      | null;
     const c = Array.isArray(customer) ? customer[0] ?? null : customer;
     const rawItems = row.order_items as SupplierOrderItem[] | null;
     const orderStatus = normalizeOrderStatus(String(row.status));
-    const items = (rawItems ?? []).map((item) => ({
-      ...item,
-      return_qty: Number(item.return_qty ?? 0),
-      status: normalizeOrderStatus(String(item.status ?? orderStatus)),
-      shipped_at: item.shipped_at ?? null,
-    }));
+    const items = (rawItems ?? []).map((item) => {
+      const rawReturns = (item as { return_requests?: Record<string, unknown>[] | null }).return_requests;
+      const returns = Array.isArray(rawReturns) ? rawReturns : [];
+      return {
+        ...item,
+        return_qty: Number(item.return_qty ?? 0),
+        status: normalizeOrderStatus(String(item.status ?? orderStatus)),
+        shipped_at: item.shipped_at ?? null,
+        return_requests: returns.map((r) => ({
+          id: String(r.id),
+          qty: Number(r.qty),
+          reason: r.reason != null ? String(r.reason) : null,
+          status: r.status as LineReturnRequestSummary["status"],
+          resolution: String(r.resolution),
+          refund_kind: String(r.refund_kind),
+          refund_cents: Number(r.refund_cents),
+          return_accepted: r.return_accepted as boolean | null,
+          created_at: String(r.created_at),
+        })),
+      };
+    });
     return {
       id: row.id,
       customer_id: row.customer_id,
@@ -71,38 +112,11 @@ async function fetchSupplierOrders(supplierId: string): Promise<SupplierOrder[]>
 
 export function useSupplierOrders(supplierId: string | null) {
   const enabled = isSupabaseConfigured() && !!supplierId;
-  const queryClient = useQueryClient();
 
-  const query = useQuery({
+  return useQuery({
     queryKey: ["supplier-orders", supplierId],
     queryFn: () => fetchSupplierOrders(supplierId!),
     enabled,
-    staleTime: 10_000,
+    staleTime: 0,
   });
-
-  useEffect(() => {
-    if (!enabled || !supplierId) return;
-
-    const channel = supabase
-      .channel(`supplier-orders-${supplierId}-${uniqueRealtimeTopic()}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "orders",
-          filter: `supplier_id=eq.${supplierId}`,
-        },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ["supplier-orders", supplierId] });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [enabled, supplierId, queryClient]);
-
-  return query;
 }

@@ -1,13 +1,16 @@
-import { useMemo } from "react";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
+import { ReturnRequestSheet, type ReturnRequestLine } from "@/components/ReturnRequestSheet";
 import { ShopperOrderCard } from "@/components/ShopperOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
-import { useCustomerOrders, type CustomerOrder } from "@/hooks/useCustomerOrders";
+import { useCustomerOrders, type CustomerOrder, type CustomerOrderItem } from "@/hooks/useCustomerOrders";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { createReturnRequest } from "@/lib/returns-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -19,9 +22,31 @@ function partnerLabel(order: CustomerOrder): string {
 
 export default function CustomerOrdersScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const theme = useTheme();
   const customerId = useSessionStore((s) => s.userId);
   const { data: orders = [], isPending, error } = useCustomerOrders(customerId);
+  const [returnLine, setReturnLine] = useState<CustomerOrderItem | null>(null);
+  const [returnSaving, setReturnSaving] = useState(false);
+  const [returnBusyLineId, setReturnBusyLineId] = useState<string | null>(null);
+
+  async function submitReturn(qty: number, reason: string) {
+    if (!returnLine || !customerId) return;
+    setReturnSaving(true);
+    setReturnBusyLineId(returnLine.id);
+    try {
+      await createReturnRequest(returnLine.id, qty, reason);
+      void queryClient.invalidateQueries({ queryKey: ["customer-orders", customerId] });
+      void queryClient.invalidateQueries({ queryKey: ["customer-returns", customerId] });
+      setReturnLine(null);
+      Alert.alert("Request sent", "Your partner will review this return or refund request.");
+    } catch (e) {
+      Alert.alert("Could not submit", (e as Error).message);
+    } finally {
+      setReturnSaving(false);
+      setReturnBusyLineId(null);
+    }
+  }
 
   const sections = useMemo(() => {
     const bySupplier = new Map<string, CustomerOrder[]>();
@@ -80,8 +105,8 @@ export default function CustomerOrdersScreen() {
       </View>
 
       <ThemedText variant="caption" color="muted" style={{ marginBottom: 16 }}>
-        Status updates when your partner moves the order along. Pull to refresh is not required—updates
-        stream in when available.
+        Status updates stream in live. On delivered items, tap Request return / refund within the
+        30-day window—or open My Returns from the menu.
       </ThemedText>
 
       {isPending ? (
@@ -126,12 +151,27 @@ export default function CustomerOrdersScreen() {
                 {section.title}
               </ThemedText>
               {section.data.map((order) => (
-                <ShopperOrderCard key={order.id} order={order} />
+                <ShopperOrderCard
+                  key={order.id}
+                  order={order}
+                  returnBusyLineId={returnBusyLineId}
+                  onRequestReturn={(line) => setReturnLine(line)}
+                />
               ))}
             </View>
           )}
         />
       )}
+      <ReturnRequestSheet
+        visible={returnLine != null}
+        line={returnLine as ReturnRequestLine | null}
+        saving={returnSaving}
+        onSubmit={(qty, reason) => void submitReturn(qty, reason)}
+        onClose={() => {
+          if (returnSaving) return;
+          setReturnLine(null);
+        }}
+      />
     </Screen>
   );
 }

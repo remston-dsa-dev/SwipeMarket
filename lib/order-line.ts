@@ -3,12 +3,35 @@ import type { OrderStatus } from "@/lib/order-status";
 export const RETURN_WARRANTY_DAYS = 30;
 const RETURN_WARRANTY_MS = RETURN_WARRANTY_DAYS * 24 * 60 * 60 * 1000;
 
+export type LineReturnRequestSummary = {
+  id: string;
+  qty: number;
+  reason?: string | null;
+  status: "requested" | "resolved" | "cancelled";
+  resolution: string;
+  refund_kind: string;
+  refund_cents: number;
+  return_accepted: boolean | null;
+  created_at: string;
+};
+
 export type OrderLineFields = {
   qty: number;
   return_qty: number;
   status: OrderStatus;
   shipped_at: string | null;
+  return_requests?: LineReturnRequestSummary[];
 };
+
+export function linePendingReturnQty(line: Pick<OrderLineFields, "return_requests">): number {
+  return (line.return_requests ?? [])
+    .filter((r) => r.status === "requested")
+    .reduce((s, r) => s + r.qty, 0);
+}
+
+export function lineReturnableQty(line: OrderLineFields): number {
+  return Math.max(0, line.qty - line.return_qty - linePendingReturnQty(line));
+}
 
 export function orderLineTotals<T extends Pick<OrderLineFields, "qty" | "return_qty">>(
   items: T[],
@@ -35,7 +58,7 @@ export function orderSummaryLabel(
 }
 
 export function isLineReturnEligible(line: OrderLineFields): boolean {
-  if (line.return_qty >= line.qty) return false;
+  if (lineReturnableQty(line) <= 0) return false;
   if (line.status !== "delivered") return false;
   if (!line.shipped_at) return false;
   const shippedMs = new Date(line.shipped_at).getTime();

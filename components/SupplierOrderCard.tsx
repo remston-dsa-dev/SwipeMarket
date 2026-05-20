@@ -8,6 +8,7 @@ import {
   PREVIEW_LINE_COUNT,
 } from "@/components/order-card/constants";
 import { OrderLineRow } from "@/components/order-card/OrderLineRow";
+import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { SupplierOrder, SupplierOrderItem } from "@/hooks/useSupplierOrders";
@@ -25,6 +26,8 @@ type Props = {
   lineStatusBusyId?: string | null;
   onChangeOrderStatus: () => void;
   onChangeLineStatus: (line: SupplierOrderItem) => void;
+  onResolveReturn?: (requestId: string, line: SupplierOrderItem) => void;
+  resolveReturnBusyId?: string | null;
 };
 
 export function SupplierOrderCard({
@@ -33,6 +36,8 @@ export function SupplierOrderCard({
   lineStatusBusyId,
   onChangeOrderStatus,
   onChangeLineStatus,
+  onResolveReturn,
+  resolveReturnBusyId,
 }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -69,6 +74,13 @@ export function SupplierOrderCard({
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1, gap: 6 }}>
+          <OrderPartyBadge
+            party={{
+              name: order.customer?.full_name ?? "",
+              avatarUrl: order.customer?.avatar_url ?? null,
+              fallbackLabel: "Shopper",
+            }}
+          />
           <ThemedText variant="caption" color="muted">
             {when}
           </ThemedText>
@@ -110,14 +122,39 @@ export function SupplierOrderCard({
           overflow: expanded ? "visible" : "hidden",
         }}
       >
-        {visibleLines.map((line) => (
-          <OrderLineRow
-            key={line.id}
-            line={line}
-            onStatusPress={() => onChangeLineStatus(line)}
-            statusBusy={lineStatusBusyId === line.id}
-          />
-        ))}
+        {visibleLines.map((line) => {
+          const pending = line.return_requests.find((r) => r.status === "requested");
+          return (
+            <View key={line.id} style={{ gap: 8 }}>
+              <OrderLineRow
+                line={line}
+                onStatusPress={() => onChangeLineStatus(line)}
+                statusBusy={lineStatusBusyId === line.id}
+              />
+              {pending && onResolveReturn ? (
+                <PressableScale
+                  accessibilityLabel="Resolve return request"
+                  onPress={() => onResolveReturn(pending.id, line)}
+                  disabled={resolveReturnBusyId === pending.id}
+                  style={{
+                    alignSelf: "flex-start",
+                    marginLeft: 56,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: theme.radius.md,
+                    backgroundColor: theme.colors.primary,
+                  }}
+                >
+                  <ThemedText variant="caption" color="onPrimary" style={{ fontWeight: "600" }}>
+                    {resolveReturnBusyId === pending.id
+                      ? "Saving…"
+                      : `Resolve return (${pending.qty} unit${pending.qty === 1 ? "" : "s"})`}
+                  </ThemedText>
+                </PressableScale>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
 
       {hiddenCount > 0 && (

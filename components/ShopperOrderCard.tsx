@@ -8,6 +8,7 @@ import {
   PREVIEW_LINE_COUNT,
 } from "@/components/order-card/constants";
 import { OrderLineRow } from "@/components/order-card/OrderLineRow";
+import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { CustomerOrder } from "@/hooks/useCustomerOrders";
@@ -21,9 +22,11 @@ import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   order: CustomerOrder;
+  onRequestReturn?: (line: CustomerOrder["order_items"][number]) => void;
+  returnBusyLineId?: string | null;
 };
 
-export function ShopperOrderCard({ order }: Props) {
+export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
 
@@ -59,6 +62,13 @@ export function ShopperOrderCard({ order }: Props) {
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1, gap: 6 }}>
+          <OrderPartyBadge
+            party={{
+              name: order.supplier?.full_name ?? "",
+              avatarUrl: order.supplier?.avatar_url ?? null,
+              fallbackLabel: "Partner",
+            }}
+          />
           <ThemedText variant="caption" color="muted">
             {when}
           </ThemedText>
@@ -97,7 +107,12 @@ export function ShopperOrderCard({ order }: Props) {
         }}
       >
         {visibleLines.map((line) => (
-          <OrderLineRow key={line.id} line={line} />
+          <OrderLineRow
+            key={line.id}
+            line={line}
+            onRequestReturn={onRequestReturn ? () => onRequestReturn(line) : undefined}
+            returnBusy={returnBusyLineId === line.id}
+          />
         ))}
       </View>
 

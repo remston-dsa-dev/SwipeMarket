@@ -1,4 +1,5 @@
 import { Redirect, Stack } from "expo-router";
+import { useSupplierRealtime } from "@/hooks/useSupplierRealtime";
 import { HREF_ONBOARDING } from "@/lib/routes";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -7,6 +8,8 @@ export default function SupplierLayout() {
   const userId             = useSessionStore((s) => s.userId);
   const role               = useSessionStore((s) => s.role);
   const onboardingComplete = useSessionStore((s) => s.onboardingComplete);
+
+  useSupplierRealtime(role === "supplier" ? userId : null);
 
   if (!authInitialized) return null;
   if (!userId) return <Redirect href="/" />;

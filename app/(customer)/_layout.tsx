@@ -1,5 +1,6 @@
 import { Redirect, Stack } from "expo-router";
 import { useEffect } from "react";
+import { useCustomerRealtime } from "@/hooks/useCustomerRealtime";
 import { fetchMyCartLines } from "@/lib/cart-remote";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { HREF_ONBOARDING } from "@/lib/routes";
@@ -11,6 +12,8 @@ export default function CustomerLayout() {
   const userId = useSessionStore((s) => s.userId);
   const role = useSessionStore((s) => s.role);
   const onboardingComplete = useSessionStore((s) => s.onboardingComplete);
+
+  useCustomerRealtime(role === "customer" ? userId : null);
 
   useEffect(() => {
     if (!userId || role !== "customer" || !isSupabaseConfigured()) return;

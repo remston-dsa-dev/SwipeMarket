@@ -4,9 +4,11 @@ import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import {
   isLineReturnEligible,
+  linePendingReturnQty,
   returnWarrantyDaysRemaining,
   type OrderLineFields,
 } from "@/lib/order-line";
+import { returnResolutionLabel, type ReturnResolution } from "@/lib/return-resolution";
 import { orderStatusBadgeStyle, orderStatusColor, orderStatusLabel } from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -21,13 +23,22 @@ type Props = {
   line: OrderLineDisplay;
   onStatusPress?: () => void;
   statusBusy?: boolean;
+  onRequestReturn?: () => void;
+  returnBusy?: boolean;
 };
 
-export function OrderLineRow({ line, onStatusPress, statusBusy }: Props) {
+export function OrderLineRow({
+  line,
+  onStatusPress,
+  statusBusy,
+  onRequestReturn,
+  returnBusy,
+}: Props) {
   const theme = useTheme();
-  const color = orderStatusColor(line.status);
   const eligible = isLineReturnEligible(line);
   const daysLeft = returnWarrantyDaysRemaining(line.shipped_at);
+  const pendingQty = linePendingReturnQty(line);
+  const resolvedReturns = (line.return_requests ?? []).filter((r) => r.status === "resolved");
 
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -54,6 +65,37 @@ export function OrderLineRow({ line, onStatusPress, statusBusy }: Props) {
             Return window ended
           </ThemedText>
         )}
+        {pendingQty > 0 ? (
+          <ThemedText variant="caption" style={{ color: "#D97706" }}>
+            Return pending review · {pendingQty} unit{pendingQty === 1 ? "" : "s"}
+          </ThemedText>
+        ) : null}
+        {resolvedReturns.slice(-1).map((r) => (
+          <ThemedText key={r.id} variant="caption" color="muted" numberOfLines={1}>
+            {returnResolutionLabel(r.resolution as ReturnResolution)}
+            {r.refund_kind !== "none" ? ` · $${(r.refund_cents / 100).toFixed(2)} refund` : ""}
+          </ThemedText>
+        ))}
+        {eligible && onRequestReturn ? (
+          <PressableScale
+            accessibilityLabel={`Request return for ${line.title}`}
+            onPress={onRequestReturn}
+            disabled={returnBusy}
+            style={{
+              alignSelf: "flex-start",
+              marginTop: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: theme.radius.pill,
+              borderWidth: 1,
+              borderColor: theme.colors.primary,
+            }}
+          >
+            <ThemedText variant="caption" color="primary" style={{ fontWeight: "600" }}>
+              {returnBusy ? "Submitting…" : "Request return / refund"}
+            </ThemedText>
+          </PressableScale>
+        ) : null}
       </View>
       {onStatusPress ? (
         <PressableScale

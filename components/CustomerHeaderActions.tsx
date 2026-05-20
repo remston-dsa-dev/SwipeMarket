@@ -7,6 +7,7 @@ import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
+import { useCustomerReturns } from "@/hooks/useReturnRequests";
 import { signOutApp } from "@/lib/sign-out";
 import { STATUS_ERROR, STATUS_SUCCESS } from "@/lib/status-colors";
 import { useSessionStore } from "@/stores/session-store";
@@ -67,15 +68,16 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const userId = useSessionStore((s) => s.userId);
   const { data: orders = [] } = useCustomerOrders(userId);
+  const { data: returns = [] } = useCustomerReturns(userId);
 
   const menuCounts = useMemo(
     (): Record<MenuKey, number> => ({
       orders: orders.length,
-      returns: 0,
+      returns: returns.filter((r) => r.status === "requested").length,
       favorites: 0,
       more: 0,
     }),
-    [orders.length],
+    [orders.length, returns],
   );
 
   const activeKey = useMemo((): MenuKey | null => {
