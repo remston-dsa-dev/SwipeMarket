@@ -4,6 +4,11 @@ import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { ReturnRequestCard } from "@/components/ReturnRequestCard";
+import {
+  countReturnStatusFilters,
+  ReturnStatusFilterChips,
+  type ReturnStatusFilter,
+} from "@/components/ReturnStatusFilterChips";
 import { ReturnResolutionSheet } from "@/components/ReturnResolutionSheet";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
@@ -15,8 +20,6 @@ import type { ReturnResolution } from "@/lib/return-resolution";
 import { resolveReturnRequest } from "@/lib/returns-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
-
-type StatusFilter = "all" | "requested" | "resolved";
 
 type ReturnResolveTarget = {
   requestId: string;
@@ -46,7 +49,7 @@ export default function SupplierReturnsScreen() {
   const theme = useTheme();
   const supplierId = useSessionStore((s) => s.userId);
   const { data: returns = [], isPending, error } = useSupplierReturns(supplierId);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<ReturnStatusFilter>("all");
   const [resolveTarget, setResolveTarget] = useState<ReturnResolveTarget | null>(null);
   const [resolveBusyId, setResolveBusyId] = useState<string | null>(null);
 
@@ -55,10 +58,12 @@ export default function SupplierReturnsScreen() {
     return returns.filter((r) => r.status === statusFilter);
   }, [returns, statusFilter]);
 
-  const pendingTotal = useMemo(
-    () => returns.filter((r) => r.status === "requested").length,
+  const filterCounts = useMemo(
+    () => countReturnStatusFilters(returns.map((r) => r.status)),
     [returns],
   );
+
+  const pendingTotal = filterCounts.requested;
 
   const sections = useMemo(() => {
     const byCustomer = new Map<string, ReturnRequestRow[]>();
@@ -162,34 +167,13 @@ export default function SupplierReturnsScreen() {
         Grouped by shopper below.
       </ThemedText>
 
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-        {(
-          [
-            { key: "all", label: "All" },
-            { key: "requested", label: "Pending" },
-            { key: "resolved", label: "Resolved" },
-          ] as const
-        ).map((f) => (
-          <PressableScale
-            key={f.key}
-            accessibilityLabel={`Filter ${f.label}`}
-            onPress={() => setStatusFilter(f.key)}
-            style={{
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: theme.radius.pill,
-              borderWidth: 1,
-              borderColor: statusFilter === f.key ? theme.colors.primary : theme.colors.border,
-              backgroundColor:
-                statusFilter === f.key ? theme.colors.primary : theme.colors.surface,
-            }}
-          >
-            <ThemedText variant="caption" color={statusFilter === f.key ? "onPrimary" : "primary"}>
-              {f.label}
-            </ThemedText>
-          </PressableScale>
-        ))}
-      </View>
+      {returns.length > 0 ? (
+        <ReturnStatusFilterChips
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={filterCounts}
+        />
+      ) : null}
 
       {isPending ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>

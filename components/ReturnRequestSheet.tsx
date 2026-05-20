@@ -3,7 +3,16 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from
 import { Image } from "expo-image";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { lineReturnableQty, RETURN_WARRANTY_DAYS, type OrderLineFields } from "@/lib/order-line";
+import { useReturnWarrantyNow } from "@/hooks/useReturnWarrantyClock";
+import {
+  formatReturnWarrantyExpiresAt,
+  formatReturnWarrantyRemaining,
+  getReturnWarrantySnapshot,
+  isLineReturnEligible,
+  lineReturnableQty,
+  RETURN_WARRANTY_DAYS,
+  type OrderLineFields,
+} from "@/lib/order-line";
 import { useTheme } from "@/theme/ThemeContext";
 
 export type ReturnRequestLine = OrderLineFields & {
@@ -23,6 +32,9 @@ type Props = {
 
 export function ReturnRequestSheet({ visible, line, saving, onSubmit, onClose }: Props) {
   const theme = useTheme();
+  const now = useReturnWarrantyNow(line?.shipped_at ?? null);
+  const warranty = line ? getReturnWarrantySnapshot(line.shipped_at, now) : null;
+  const eligible = line ? isLineReturnEligible(line, now) : false;
   const maxQty = line ? lineReturnableQty(line) : 1;
   const [qty, setQty] = useState(1);
   const [reason, setReason] = useState("");
@@ -58,8 +70,18 @@ export function ReturnRequestSheet({ visible, line, saving, onSubmit, onClose }:
         >
           <ThemedText variant="headline">Request return or refund</ThemedText>
           <ThemedText variant="caption" color="muted">
-            Your partner will review within the {RETURN_WARRANTY_DAYS}-day return window. Refunds are
-            issued after they resolve the request.
+            {warranty && !warranty.windowEnded ? (
+              <>
+                {formatReturnWarrantyRemaining(warranty)} in your {RETURN_WARRANTY_DAYS}-day window
+                (ends {formatReturnWarrantyExpiresAt(warranty.expiresAtMs)}). Refunds are issued
+                after your partner resolves the request.
+              </>
+            ) : (
+              <>
+                The {RETURN_WARRANTY_DAYS}-day return window for this item has ended. Refunds are
+                issued after your partner resolves the request.
+              </>
+            )}
           </ThemedText>
 
           <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
@@ -122,20 +144,21 @@ export function ReturnRequestSheet({ visible, line, saving, onSubmit, onClose }:
 
           <PressableScale
             accessibilityLabel="Submit return request"
-            disabled={!!saving}
+            disabled={!!saving || !eligible || maxQty < 1}
             onPress={() => onSubmit(qty, reason)}
             style={{
               paddingVertical: 14,
               borderRadius: theme.radius.md,
               backgroundColor: theme.colors.primary,
               alignItems: "center",
+              opacity: saving || !eligible || maxQty < 1 ? 0.55 : 1,
             }}
           >
             {saving ? (
               <ActivityIndicator color={theme.colors.textOnPrimary} />
             ) : (
               <ThemedText variant="label" color="onPrimary">
-                Submit request
+                {!eligible ? "Return window ended" : "Submit request"}
               </ThemedText>
             )}
           </PressableScale>

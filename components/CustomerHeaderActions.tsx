@@ -8,6 +8,7 @@ import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
 import { useCustomerReturns } from "@/hooks/useReturnRequests";
+import { countReturnRequestsInOrders } from "@/lib/return-menu-count";
 import { signOutApp } from "@/lib/sign-out";
 import { STATUS_ERROR, STATUS_SUCCESS } from "@/lib/status-colors";
 import { useSessionStore } from "@/stores/session-store";
@@ -70,14 +71,19 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
   const { data: orders = [] } = useCustomerOrders(userId);
   const { data: returns = [] } = useCustomerReturns(userId);
 
+  const returnRequestCount = useMemo(
+    () => Math.max(returns.length, countReturnRequestsInOrders(orders)),
+    [returns.length, orders],
+  );
+
   const menuCounts = useMemo(
     (): Record<MenuKey, number> => ({
       orders: orders.length,
-      returns: returns.filter((r) => r.status === "requested").length,
+      returns: returnRequestCount,
       favorites: 0,
       more: 0,
     }),
-    [orders.length, returns],
+    [orders.length, returnRequestCount],
   );
 
   const activeKey = useMemo((): MenuKey | null => {

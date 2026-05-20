@@ -1,7 +1,66 @@
 import type { OrderStatus } from "@/lib/order-status";
 
 export const RETURN_WARRANTY_DAYS = 30;
-const RETURN_WARRANTY_MS = RETURN_WARRANTY_DAYS * 24 * 60 * 60 * 1000;
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+const RETURN_WARRANTY_MS = RETURN_WARRANTY_DAYS * MS_PER_DAY;
+
+export type ReturnWarrantySnapshot = {
+  remainingMs: number;
+  expiresAtMs: number;
+  /** Full days left (0 on the final partial day). */
+  daysLeft: number;
+  eligible: boolean;
+  windowEnded: boolean;
+};
+
+/** Hard check from shipped_at + exact 30×24h window (optional `now` for tests). */
+export function getReturnWarrantySnapshot(
+  shippedAt: string | null,
+  now = Date.now(),
+): ReturnWarrantySnapshot | null {
+  if (!shippedAt) return null;
+  const shippedMs = new Date(shippedAt).getTime();
+  if (Number.isNaN(shippedMs)) return null;
+
+  const expiresAtMs = shippedMs + RETURN_WARRANTY_MS;
+  const remainingMs = expiresAtMs - now;
+  const windowEnded = remainingMs <= 0;
+
+  return {
+    remainingMs: Math.max(0, remainingMs),
+    expiresAtMs,
+    daysLeft: windowEnded ? 0 : Math.floor(remainingMs / MS_PER_DAY),
+    eligible: !windowEnded,
+    windowEnded,
+  };
+}
+
+/** Live-friendly label: days, hours, or minutes left. */
+export function formatReturnWarrantyRemaining(snapshot: ReturnWarrantySnapshot): string {
+  if (snapshot.windowEnded) return "Return window ended";
+
+  const { remainingMs } = snapshot;
+  const days = Math.floor(remainingMs / MS_PER_DAY);
+  const hours = Math.floor((remainingMs % MS_PER_DAY) / MS_PER_HOUR);
+  const minutes = Math.floor((remainingMs % MS_PER_HOUR) / (60 * 1000));
+
+  if (days >= 2) return `${days} days left`;
+  if (days === 1) return hours > 0 ? `1 day, ${hours} hr left` : "1 day left";
+  if (hours >= 2) return `${hours} hours left`;
+  if (hours === 1) return minutes > 0 ? `1 hr ${minutes} min left` : "1 hour left";
+  if (minutes >= 1) return `${minutes} min left`;
+  return "Less than 1 min left";
+}
+
+export function formatReturnWarrantyExpiresAt(expiresAtMs: number): string {
+  return new Date(expiresAtMs).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export type LineReturnRequestSummary = {
   id: string;
@@ -57,20 +116,19 @@ export function orderSummaryLabel(
   return `${products} (${total})${returns}`;
 }
 
-export function isLineReturnEligible(line: OrderLineFields): boolean {
+export function isLineReturnEligible(line: OrderLineFields, now = Date.now()): boolean {
   if (lineReturnableQty(line) <= 0) return false;
   if (line.status !== "delivered") return false;
-  if (!line.shipped_at) return false;
-  const shippedMs = new Date(line.shipped_at).getTime();
-  if (Number.isNaN(shippedMs)) return false;
-  return Date.now() - shippedMs <= RETURN_WARRANTY_MS;
+  const snap = getReturnWarrantySnapshot(line.shipped_at, now);
+  return !!snap?.eligible;
 }
 
-export function returnWarrantyDaysRemaining(shippedAt: string | null): number | null {
-  if (!shippedAt) return null;
-  const shippedMs = new Date(shippedAt).getTime();
-  if (Number.isNaN(shippedMs)) return null;
-  const remainingMs = RETURN_WARRANTY_MS - (Date.now() - shippedMs);
-  if (remainingMs <= 0) return 0;
-  return Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+/** @deprecated Prefer getReturnWarrantySnapshot + formatReturnWarrantyRemaining */
+export function returnWarrantyDaysRemaining(
+  shippedAt: string | null,
+  now = Date.now(),
+): number | null {
+  const snap = getReturnWarrantySnapshot(shippedAt, now);
+  if (!snap) return null;
+  return snap.daysLeft;
 }

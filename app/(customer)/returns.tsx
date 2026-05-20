@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { ReturnRequestCard } from "@/components/ReturnRequestCard";
+import {
+  countReturnStatusFilters,
+  ReturnStatusFilterChips,
+  type ReturnStatusFilter,
+} from "@/components/ReturnStatusFilterChips";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
@@ -19,7 +24,18 @@ export default function CustomerReturnsScreen() {
   const theme = useTheme();
   const customerId = useSessionStore((s) => s.userId);
   const { data: returns = [], isPending, error } = useCustomerReturns(customerId);
+  const [statusFilter, setStatusFilter] = useState<ReturnStatusFilter>("all");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const filterCounts = useMemo(
+    () => countReturnStatusFilters(returns.map((r) => r.status)),
+    [returns],
+  );
+
+  const filteredReturns = useMemo(() => {
+    if (statusFilter === "all") return returns;
+    return returns.filter((r) => r.status === statusFilter);
+  }, [returns, statusFilter]);
 
   async function handleCancel(requestId: string) {
     if (!customerId) return;
@@ -70,10 +86,18 @@ export default function CustomerReturnsScreen() {
         <CustomerHeaderActions />
       </View>
 
-      <ThemedText variant="caption" color="muted" style={{ marginBottom: 16 }}>
+      <ThemedText variant="caption" color="muted" style={{ marginBottom: 12 }}>
         Request returns from My Orders on delivered items. Each partner reviews and resolves with
         their chosen refund outcome.
       </ThemedText>
+
+      {returns.length > 0 ? (
+        <ReturnStatusFilterChips
+          value={statusFilter}
+          onChange={setStatusFilter}
+          counts={filterCounts}
+        />
+      ) : null}
 
       {isPending ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -104,9 +128,15 @@ export default function CustomerReturnsScreen() {
             </ThemedText>
           </PressableScale>
         </View>
+      ) : filteredReturns.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <ThemedText variant="body" color="muted">
+            No return requests match this filter.
+          </ThemedText>
+        </View>
       ) : (
         <FlatList
-          data={returns}
+          data={filteredReturns}
           keyExtractor={(r) => r.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ gap: 12, paddingBottom: 32 }}

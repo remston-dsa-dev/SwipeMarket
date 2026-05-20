@@ -10,6 +10,7 @@ import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { useCustomerOrders, type CustomerOrder, type CustomerOrderItem } from "@/hooks/useCustomerOrders";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { isLineReturnEligible } from "@/lib/order-line";
 import { createReturnRequest } from "@/lib/returns-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -32,6 +33,11 @@ export default function CustomerOrdersScreen() {
 
   async function submitReturn(qty: number, reason: string) {
     if (!returnLine || !customerId) return;
+    if (!isLineReturnEligible(returnLine)) {
+      Alert.alert("Return window ended", "The 30-day return period for this item has passed.");
+      setReturnLine(null);
+      return;
+    }
     setReturnSaving(true);
     setReturnBusyLineId(returnLine.id);
     try {
@@ -105,8 +111,7 @@ export default function CustomerOrdersScreen() {
       </View>
 
       <ThemedText variant="caption" color="muted" style={{ marginBottom: 16 }}>
-        Status updates stream in live. On delivered items, tap Request return / refund within the
-        30-day window—or open My Returns from the menu.
+        Status updates stream in live. Expand Return on a delivered line to request a refund.
       </ThemedText>
 
       {isPending ? (
@@ -155,7 +160,16 @@ export default function CustomerOrdersScreen() {
                   key={order.id}
                   order={order}
                   returnBusyLineId={returnBusyLineId}
-                  onRequestReturn={(line) => setReturnLine(line)}
+                  onRequestReturn={(line) => {
+                    if (!isLineReturnEligible(line)) {
+                      Alert.alert(
+                        "Return window ended",
+                        "The 30-day return period for this item has passed.",
+                      );
+                      return;
+                    }
+                    setReturnLine(line);
+                  }}
                 />
               ))}
             </View>

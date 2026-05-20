@@ -8,6 +8,7 @@ import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useSupplierReturns } from "@/hooks/useReturnRequests";
 import { useSupplierOrders } from "@/hooks/useSupplierOrders";
+import { countReturnRequestsInOrders } from "@/lib/return-menu-count";
 import { useSupplierProducts } from "@/hooks/useSupplierProducts";
 import { signOutApp } from "@/lib/sign-out";
 import { STATUS_ERROR, STATUS_SUCCESS } from "@/lib/status-colors";
@@ -86,15 +87,20 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
   const { data: products = [] } = useSupplierProducts(supplierId);
   const { data: returns = [] } = useSupplierReturns(supplierId);
 
+  const returnRequestCount = useMemo(
+    () => Math.max(returns.length, countReturnRequestsInOrders(orders)),
+    [returns.length, orders],
+  );
+
   const menuCounts = useMemo(
     (): Record<MenuKey, number> => ({
       dashboard: products.length,
       addProduct: 0,
       orders: orders.length,
-      returns: returns.filter((r) => r.status === "requested").length,
+      returns: returnRequestCount,
       more: 0,
     }),
-    [orders.length, products.length, returns],
+    [orders.length, products.length, returnRequestCount],
   );
 
   const activeKey = useMemo((): MenuKey | null => {

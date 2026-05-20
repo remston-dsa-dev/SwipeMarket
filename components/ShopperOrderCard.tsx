@@ -12,12 +12,7 @@ import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { CustomerOrder } from "@/hooks/useCustomerOrders";
-import {
-  isLineReturnEligible,
-  orderLineTotals,
-  orderSummaryLabel,
-  RETURN_WARRANTY_DAYS,
-} from "@/lib/order-line";
+import { orderLineTotals, orderSummaryLabel } from "@/lib/order-line";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
@@ -46,7 +41,6 @@ export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: P
     ? order.order_items
     : order.order_items.slice(0, PREVIEW_LINE_COUNT);
   const hiddenCount = Math.max(0, productCount - PREVIEW_LINE_COUNT);
-  const hasEligibleReturns = order.order_items.some(isLineReturnEligible);
 
   return (
     <View
@@ -81,23 +75,6 @@ export function ShopperOrderCard({ order, onRequestReturn, returnBusyLineId }: P
       </View>
 
       <OrderStatusTimeline status={order.status} />
-
-      {hasEligibleReturns && (
-        <View
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            borderRadius: theme.radius.sm,
-            backgroundColor: theme.colors.overlay,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <ThemedText variant="caption" color="secondary">
-            Delivered products are eligible to return within {RETURN_WARRANTY_DAYS} days of delivery.
-          </ThemedText>
-        </View>
-      )}
 
       <View
         style={{
