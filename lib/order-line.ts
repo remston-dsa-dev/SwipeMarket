@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@/lib/order-status";
+import type { OrderStatus, ShopperDisplayStatus } from "@/lib/order-status";
 
 export const RETURN_WARRANTY_DAYS = 30;
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -121,6 +121,50 @@ export function isLineReturnEligible(line: OrderLineFields, now = Date.now()): b
   if (line.status !== "delivered") return false;
   const snap = getReturnWarrantySnapshot(line.shipped_at, now);
   return !!snap?.eligible;
+}
+
+export function getShopperLineDisplayStatus(line: OrderLineFields): ShopperDisplayStatus {
+  if (line.status !== "delivered") {
+    return line.status;
+  }
+
+  if (linePendingReturnQty(line) > 0) {
+    return "return_requested";
+  }
+
+  if (line.qty > 0 && line.return_qty >= line.qty) {
+    return "returned";
+  }
+
+  const returnApproved = (line.return_requests ?? []).some(
+    (r) => r.status === "resolved" && r.return_accepted === true,
+  );
+  if (returnApproved) {
+    return "return_approved";
+  }
+
+  return "delivered";
+}
+
+export function getShopperOrderDisplayStatus(order: {
+  status: OrderStatus;
+  order_items: OrderLineFields[];
+}): ShopperDisplayStatus {
+  if (order.status !== "delivered") {
+    return order.status;
+  }
+
+  const lineStatuses = order.order_items.map(getShopperLineDisplayStatus);
+  if (lineStatuses.some((s) => s === "return_requested")) {
+    return "return_requested";
+  }
+  if (lineStatuses.some((s) => s === "return_approved")) {
+    return "return_approved";
+  }
+  if (lineStatuses.length > 0 && lineStatuses.every((s) => s === "returned")) {
+    return "returned";
+  }
+  return "delivered";
 }
 
 /** @deprecated Prefer getReturnWarrantySnapshot + formatReturnWarrantyRemaining */

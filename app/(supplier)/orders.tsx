@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { OrderStatusPickerSheet } from "@/components/OrderStatusPickerSheet";
 import { ReturnResolutionSheet } from "@/components/ReturnResolutionSheet";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
+import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
 import { SupplierOrderCard } from "@/components/SupplierOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
@@ -190,10 +191,7 @@ export default function SupplierOrdersScreen() {
         </View>
       ) : (
         <>
-          <ThemedText variant="caption" color="muted" style={{ marginBottom: 12 }}>
-            Tap Resolve on pending return requests. Choose whether to accept the return and how much
-            to refund.
-          </ThemedText>
+          <OrderStatusLegend />
           <FlatList
             data={sections}
             keyExtractor={(s) => s.customerId}

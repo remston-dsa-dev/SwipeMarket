@@ -12,7 +12,7 @@ import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { CustomerOrder } from "@/hooks/useCustomerOrders";
-import { orderLineTotals, orderSummaryLabel } from "@/lib/order-line";
+import { getShopperOrderDisplayStatus, orderLineTotals, orderSummaryLabel } from "@/lib/order-line";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
@@ -41,6 +41,11 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
   const { totalCount, totalReturns, productCount } = useMemo(
     () => orderLineTotals(order.order_items),
     [order.order_items],
+  );
+
+  const orderDisplayStatus = useMemo(
+    () => getShopperOrderDisplayStatus(order),
+    [order],
   );
 
   const visibleLines = expanded
@@ -77,7 +82,7 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
             {orderSummaryLabel(productCount, totalCount, totalReturns)}
           </ThemedText>
         </View>
-        <OrderStatusBadge status={order.status} />
+        <OrderStatusBadge status={order.status} displayStatus={orderDisplayStatus} />
       </View>
 
       <OrderStatusTimeline status={order.status} />

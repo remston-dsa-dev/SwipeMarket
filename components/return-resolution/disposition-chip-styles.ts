@@ -1,7 +1,14 @@
 import type { ComponentProps } from "react";
 import type { Ionicons } from "@expo/vector-icons";
 import type { RefundKind } from "@/lib/return-resolution";
-import { STATUS_ERROR, STATUS_SUCCESS, STATUS_WARNING } from "@/lib/status-colors";
+import {
+  resolveStatusTone,
+  TONE_CANCELLED,
+  TONE_PLACED,
+  TONE_PROCESSING,
+  TONE_RETURN_REQUESTED,
+  type StatusScheme,
+} from "@/lib/status-colors";
 
 export type DispositionChipStyle = {
   bg: string;
@@ -10,55 +17,72 @@ export type DispositionChipStyle = {
   label: string;
 };
 
+function chipBg(color: string, scheme: StatusScheme): string {
+  const alpha = scheme === "dark" ? "38" : "24";
+  return `${color}${alpha}`;
+}
+
 export function returnChipStyle(returnAccepted: boolean, isDark: boolean): DispositionChipStyle {
+  const scheme: StatusScheme = isDark ? "dark" : "light";
   if (returnAccepted) {
+    const color = resolveStatusTone(TONE_PLACED, scheme);
     return {
       icon: "checkmark-circle",
       label: "Return accepted",
-      color: isDark ? "#34D399" : STATUS_SUCCESS,
-      bg: isDark ? "rgba(52,211,153,0.22)" : "rgba(5,150,105,0.14)",
+      color,
+      bg: chipBg(color, scheme),
     };
   }
+  const color = resolveStatusTone(TONE_CANCELLED, scheme);
   return {
     icon: "close-circle",
     label: "Return denied",
-    color: isDark ? "#F87171" : STATUS_ERROR,
-    bg: isDark ? "rgba(248,113,113,0.2)" : "rgba(220,38,38,0.12)",
+    color,
+    bg: chipBg(color, scheme),
   };
 }
 
 export function refundChipStyle(kind: RefundKind, isDark: boolean): DispositionChipStyle {
+  const scheme: StatusScheme = isDark ? "dark" : "light";
   switch (kind) {
-    case "full":
+    case "full": {
+      const color = resolveStatusTone(TONE_PLACED, scheme);
       return {
         icon: "cash",
         label: "Full refund",
-        color: isDark ? "#34D399" : STATUS_SUCCESS,
-        bg: isDark ? "rgba(52,211,153,0.22)" : "rgba(5,150,105,0.14)",
+        color,
+        bg: chipBg(color, scheme),
       };
-    case "partial":
+    }
+    case "partial": {
+      const color = resolveStatusTone(TONE_PROCESSING, scheme);
       return {
         icon: "pie-chart",
         label: "Partial refund",
-        color: isDark ? "#FBBF24" : STATUS_WARNING,
-        bg: isDark ? "rgba(251,191,36,0.2)" : "rgba(217,119,6,0.14)",
+        color,
+        bg: chipBg(color, scheme),
       };
+    }
     case "none":
-    default:
+    default: {
+      const color = resolveStatusTone(TONE_RETURN_REQUESTED, scheme);
       return {
         icon: "ban",
         label: "No refund",
-        color: isDark ? "#94A3B8" : "#64748B",
-        bg: isDark ? "rgba(148,163,184,0.18)" : "rgba(100,116,139,0.12)",
+        color,
+        bg: chipBg(color, scheme),
       };
+    }
   }
 }
 
 export function pendingChipStyle(isDark: boolean): DispositionChipStyle {
+  const scheme: StatusScheme = isDark ? "dark" : "light";
+  const color = resolveStatusTone(TONE_PROCESSING, scheme);
   return {
     icon: "time",
     label: "Pending review",
-    color: isDark ? "#FBBF24" : STATUS_WARNING,
-    bg: isDark ? "rgba(251,191,36,0.2)" : "rgba(217,119,6,0.14)",
+    color,
+    bg: chipBg(color, scheme),
   };
 }

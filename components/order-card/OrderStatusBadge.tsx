@@ -1,19 +1,36 @@
 import { View } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import { orderStatusBadgeStyle, orderStatusLabel, type OrderStatus } from "@/lib/order-status";
+import {
+  orderStatusBadgeStyle,
+  orderStatusLabel,
+  shopperDisplayStatusBadgeStyle,
+  shopperDisplayStatusLabel,
+  type OrderStatus,
+  type ShopperDisplayStatus,
+} from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   status: OrderStatus;
+  /** When set (shopper orders), overrides the delivered label during returns. */
+  displayStatus?: ShopperDisplayStatus;
   onPress?: () => void;
   busy?: boolean;
 };
 
-export function OrderStatusBadge({ status, onPress, busy }: Props) {
+export function OrderStatusBadge({ status, displayStatus, onPress, busy }: Props) {
   const theme = useTheme();
-  const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(status);
-  const label = busy ? "…" : orderStatusLabel(status);
+  const effective = displayStatus ?? status;
+  const useShopperStyle = displayStatus != null && displayStatus !== status;
+  const { borderColor, backgroundColor, textColor } = useShopperStyle
+    ? shopperDisplayStatusBadgeStyle(effective, theme.scheme)
+    : orderStatusBadgeStyle(status, theme.scheme);
+  const label = busy
+    ? "…"
+    : useShopperStyle
+      ? shopperDisplayStatusLabel(effective)
+      : orderStatusLabel(status);
 
   const badge = (
     <View

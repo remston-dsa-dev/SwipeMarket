@@ -30,6 +30,7 @@ export function OrderStatusTimeline({ status }: Props) {
   return (
     <TimelineTrack
       status={status}
+      scheme={theme.scheme}
       trackMuted={theme.colors.border}
       surface={theme.colors.surface}
     />
@@ -38,11 +39,13 @@ export function OrderStatusTimeline({ status }: Props) {
 
 function TimelineTrack({
   status,
+  scheme,
   frozen,
   trackMuted,
   surface,
 }: {
   status: OrderStatus;
+  scheme: "light" | "dark";
   frozen?: boolean;
   trackMuted: string;
   surface: string;
@@ -59,13 +62,13 @@ function TimelineTrack({
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         {ORDER_TIMELINE_STEPS.map((step, index) => {
           const stepState = frozen ? "upcoming" : orderTimelineStepState(step, status);
-          const color = orderStatusColor(step);
+          const color = orderStatusColor(step, scheme);
           const isCurrent = stepState === "current";
           const isComplete = stepState === "complete";
           const size = isCurrent ? NODE_CURRENT : NODE;
           const segmentFilled = !frozen && currentIndex >= 0 && index > 0 && index <= currentIndex;
           const segmentColor =
-            index > 0 ? orderStatusColor(ORDER_TIMELINE_STEPS[index - 1]!) : trackMuted;
+            index > 0 ? orderStatusColor(ORDER_TIMELINE_STEPS[index - 1]!, scheme) : trackMuted;
 
           return (
             <Fragment key={step}>
@@ -98,7 +101,7 @@ function TimelineTrack({
       <View style={{ flexDirection: "row", marginTop: 10 }}>
         {ORDER_TIMELINE_STEPS.map((step, index) => {
           const stepState = frozen ? "upcoming" : orderTimelineStepState(step, status);
-          const color = orderStatusColor(step);
+          const color = orderStatusColor(step, scheme);
           const isCurrent = stepState === "current";
           const isComplete = stepState === "complete";
           const isFirst = index === 0;

@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { ReturnRequestSheet, type ReturnRequestLine } from "@/components/ReturnRequestSheet";
+import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
 import { ShopperOrderCard } from "@/components/ShopperOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
@@ -168,9 +169,7 @@ export default function CustomerOrdersScreen() {
         <CustomerHeaderActions />
       </View>
 
-      <ThemedText variant="caption" color="muted" style={{ marginBottom: 16 }}>
-        Status updates stream in live. Expand Return on a delivered line to request a refund.
-      </ThemedText>
+      <OrderStatusLegend />
 
       {isPending ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>

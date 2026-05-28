@@ -1,4 +1,16 @@
-import { STATUS_ERROR, STATUS_SUCCESS, STATUS_WARNING } from "@/lib/status-colors";
+import {
+  resolveStatusTone,
+  statusBadgeStyle,
+  TONE_CANCELLED,
+  TONE_DELIVERED,
+  TONE_PLACED,
+  TONE_PROCESSING,
+  TONE_RETURN_APPROVED,
+  TONE_RETURN_REQUESTED,
+  TONE_RETURNED,
+  TONE_SHIPPED,
+  type StatusScheme,
+} from "@/lib/status-colors";
 
 export type OrderStatus = "placed" | "processing" | "shipped" | "delivered" | "cancelled";
 
@@ -55,35 +67,81 @@ export function orderStatusLabel(s: OrderStatus): string {
   }
 }
 
-export function orderStatusColor(s: OrderStatus): string {
-  switch (s) {
+export function orderStatusColor(status: OrderStatus, scheme: StatusScheme): string {
+  switch (status) {
     case "placed":
-      return "#64748B";
+      return resolveStatusTone(TONE_PLACED, scheme);
     case "processing":
-      return STATUS_WARNING;
+      return resolveStatusTone(TONE_PROCESSING, scheme);
     case "shipped":
-      return "#2563EB";
+      return resolveStatusTone(TONE_SHIPPED, scheme);
     case "delivered":
-      return STATUS_SUCCESS;
+      return resolveStatusTone(TONE_DELIVERED, scheme);
     case "cancelled":
-      return STATUS_ERROR;
+      return resolveStatusTone(TONE_CANCELLED, scheme);
     default:
-      return "#64748B";
+      return resolveStatusTone(TONE_PLACED, scheme);
   }
 }
 
 /** Shared badge colors for order header and line status chips (shopper + partner). */
-export function orderStatusBadgeStyle(status: OrderStatus): {
+export function orderStatusBadgeStyle(
+  status: OrderStatus,
+  scheme: StatusScheme,
+): {
   borderColor: string;
   backgroundColor: string;
   textColor: string;
 } {
-  const textColor = orderStatusColor(status);
-  return {
-    borderColor: textColor,
-    backgroundColor: `${textColor}18`,
-    textColor,
-  };
+  return statusBadgeStyle(orderStatusColor(status, scheme), scheme);
+}
+
+/** Return states shown instead of "Delivered" on orders / lines. */
+export type ShopperReturnDisplayStatus =
+  | "return_requested"
+  | "return_approved"
+  | "returned";
+
+export type ShopperDisplayStatus = OrderStatus | ShopperReturnDisplayStatus;
+
+export function shopperDisplayStatusLabel(status: ShopperDisplayStatus): string {
+  switch (status) {
+    case "return_requested":
+      return "Return requested";
+    case "return_approved":
+      return "Return Approved";
+    case "returned":
+      return "Returned";
+    default:
+      return orderStatusLabel(status);
+  }
+}
+
+export function shopperDisplayStatusColor(
+  status: ShopperDisplayStatus,
+  scheme: StatusScheme,
+): string {
+  switch (status) {
+    case "return_requested":
+      return resolveStatusTone(TONE_RETURN_REQUESTED, scheme);
+    case "return_approved":
+      return resolveStatusTone(TONE_RETURN_APPROVED, scheme);
+    case "returned":
+      return resolveStatusTone(TONE_RETURNED, scheme);
+    default:
+      return orderStatusColor(status, scheme);
+  }
+}
+
+export function shopperDisplayStatusBadgeStyle(
+  status: ShopperDisplayStatus,
+  scheme: StatusScheme,
+): {
+  borderColor: string;
+  backgroundColor: string;
+  textColor: string;
+} {
+  return statusBadgeStyle(shopperDisplayStatusColor(status, scheme), scheme);
 }
 
 /** Maps legacy DB/API value to the canonical status (for realtime rows not yet migrated). */

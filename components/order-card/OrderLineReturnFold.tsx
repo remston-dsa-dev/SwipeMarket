@@ -24,7 +24,7 @@ import {
   type RefundKind,
   type ReturnResolution,
 } from "@/lib/return-resolution";
-import { STATUS_SUCCESS, STATUS_WARNING } from "@/lib/status-colors";
+import { resolveStatusTone, TONE_PLACED, TONE_PROCESSING } from "@/lib/status-colors";
 import { useTheme } from "@/theme/ThemeContext";
 import type { LineReturnRequestSummary } from "@/lib/order-line";
 
@@ -49,17 +49,17 @@ type FoldState = {
 };
 
 function toneIconColor(theme: ReturnType<typeof useTheme>, tone: FoldTone): string {
-  const isDark = theme.scheme === "dark";
+  const scheme = theme.scheme;
   switch (tone) {
     case "pending":
-      return isDark ? "#FBBF24" : STATUS_WARNING;
+      return resolveStatusTone(TONE_PROCESSING, scheme);
     case "resolved":
-      return isDark ? "#34D399" : STATUS_SUCCESS;
+      return resolveStatusTone(TONE_PLACED, scheme);
     case "ended":
       return theme.colors.textSecondary;
     case "eligible":
     default:
-      return isDark ? "#A78BFA" : theme.colors.primary;
+      return scheme === "dark" ? "#A78BFA" : theme.colors.primary;
   }
 }
 

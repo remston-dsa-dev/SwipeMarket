@@ -5,12 +5,19 @@ import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { OrderLineReturnFold } from "@/components/order-card/OrderLineReturnFold";
 import {
+  getShopperLineDisplayStatus,
   linePendingReturnQty,
   type OrderLineFields,
 } from "@/lib/order-line";
 import { ReturnDispositionSummary } from "@/components/return-resolution/ReturnDispositionSummary";
 import type { ReturnResolution } from "@/lib/return-resolution";
-import { orderStatusBadgeStyle, orderStatusColor, orderStatusLabel } from "@/lib/order-status";
+import {
+  orderStatusBadgeStyle,
+  orderStatusLabel,
+  shopperDisplayStatusBadgeStyle,
+  shopperDisplayStatusLabel,
+  type ShopperDisplayStatus,
+} from "@/lib/order-status";
 import { useTheme } from "@/theme/ThemeContext";
 
 export type OrderLineDisplay = OrderLineFields & {
@@ -41,6 +48,7 @@ export const OrderLineRow = memo(function OrderLineRow({
   const shopperReturns = onRequestReturn !== undefined;
   const pendingQty = linePendingReturnQty(line);
   const resolvedReturns = (line.return_requests ?? []).filter((r) => r.status === "resolved");
+  const lineDisplayStatus = getShopperLineDisplayStatus(line);
 
   return (
     <View style={{ width: "100%", gap: shopperReturns ? 4 : 0 }}>
@@ -88,10 +96,14 @@ export const OrderLineRow = memo(function OrderLineRow({
               onStatusPress();
             }}
           >
-            <LineStatusBadge status={line.status} busy={statusBusy} />
+            <LineStatusBadge
+              status={line.status}
+              displayStatus={lineDisplayStatus}
+              busy={statusBusy}
+            />
           </PressableScale>
         ) : (
-          <LineStatusBadge status={line.status} />
+          <LineStatusBadge status={line.status} displayStatus={lineDisplayStatus} />
         )}
       </View>
 
@@ -110,13 +122,19 @@ export const OrderLineRow = memo(function OrderLineRow({
 
 function LineStatusBadge({
   status,
+  displayStatus,
   busy,
 }: {
   status: OrderLineDisplay["status"];
+  displayStatus: ShopperDisplayStatus;
   busy?: boolean;
 }) {
   const theme = useTheme();
-  const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(status);
+  const scheme = theme.scheme;
+  const useShopperStyle = displayStatus !== status;
+  const { borderColor, backgroundColor, textColor } = useShopperStyle
+    ? shopperDisplayStatusBadgeStyle(displayStatus, scheme)
+    : orderStatusBadgeStyle(status, scheme);
 
   return (
     <View
@@ -127,11 +145,15 @@ function LineStatusBadge({
         borderWidth: 1,
         borderColor,
         backgroundColor,
-        maxWidth: 108,
+        maxWidth: useShopperStyle ? 124 : 108,
       }}
     >
       <ThemedText variant="caption" style={{ color: textColor }} numberOfLines={1}>
-        {busy ? "…" : orderStatusLabel(status)}
+        {busy
+          ? "…"
+          : useShopperStyle
+            ? shopperDisplayStatusLabel(displayStatus)
+            : orderStatusLabel(status)}
       </ThemedText>
     </View>
   );

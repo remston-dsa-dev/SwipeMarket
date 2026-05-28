@@ -59,7 +59,10 @@ export function OrderStatusPickerSheet({
           ) : null}
           {ORDER_STATUSES.map((s) => {
             const selected = currentStatus === s;
-            const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(s);
+            const { borderColor, backgroundColor, textColor } = orderStatusBadgeStyle(
+              s,
+              theme.scheme,
+            );
 
             return (
               <PressableScale

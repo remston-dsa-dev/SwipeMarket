@@ -13,6 +13,7 @@ import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { SupplierOrder, SupplierOrderItem } from "@/hooks/useSupplierOrders";
 import {
+  getShopperOrderDisplayStatus,
   isLineReturnEligible,
   orderLineTotals,
   orderSummaryLabel,
@@ -54,6 +55,11 @@ export function SupplierOrderCard({
     [order.order_items],
   );
 
+  const orderDisplayStatus = useMemo(
+    () => getShopperOrderDisplayStatus(order),
+    [order],
+  );
+
   const visibleLines = expanded
     ? order.order_items
     : order.order_items.slice(0, PREVIEW_LINE_COUNT);
@@ -91,6 +97,7 @@ export function SupplierOrderCard({
         </View>
         <OrderStatusBadge
           status={order.status}
+          displayStatus={orderDisplayStatus}
           onPress={onChangeOrderStatus}
           busy={orderStatusBusy}
         />
