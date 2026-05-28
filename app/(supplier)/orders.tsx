@@ -6,6 +6,7 @@ import { OrderStatusPickerSheet } from "@/components/OrderStatusPickerSheet";
 import { ReturnResolutionSheet } from "@/components/ReturnResolutionSheet";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
+import { OrdersEmptyState } from "@/components/order-card/OrdersEmptyState";
 import { OrdersPartySectionHeader } from "@/components/order-card/OrdersPartySectionHeader";
 import { SupplierOrderCard } from "@/components/SupplierOrderCard";
 import { PressableScale } from "@/components/PressableScale";
@@ -159,13 +160,10 @@ export default function SupplierOrdersScreen() {
           {(error as Error).message}
         </ThemedText>
       ) : orders.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", gap: 10 }}>
-          <ThemedText variant="headline">No orders yet</ThemedText>
-          <ThemedText variant="body" color="muted">
-            Orders are grouped by shopper. Tap a product status to update it, or the order badge to
-            update every product at once.
-          </ThemedText>
-        </View>
+        <OrdersEmptyState
+          variant="supplier"
+          onPrimaryPress={() => router.replace("/(supplier)/dashboard")}
+        />
       ) : (
         <>
           <OrderStatusLegend />

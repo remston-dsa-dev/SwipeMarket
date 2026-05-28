@@ -4,6 +4,8 @@ import { useRouter, useSegments } from "expo-router";
 import type { Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import type { HubMenuIconName } from "@/components/menu/HubMenuIcon";
+import { MenuIconTile } from "@/components/menu/MenuIconTile";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
@@ -24,7 +26,7 @@ type MenuItem = {
   key: MenuKey;
   label: string;
   caption: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: HubMenuIconName;
   href: Href;
 };
 
@@ -33,28 +35,28 @@ const SHOPPER_MENU: MenuItem[] = [
     key: "orders",
     label: "My Orders",
     caption: "Partners, delivery status & receipts",
-    icon: "receipt",
+    icon: "orders",
     href: "/(customer)/orders",
   },
   {
     key: "returns",
     label: "My Returns",
     caption: "Refunds and return shipments",
-    icon: "return-down-back",
+    icon: "returns",
     href: "/(customer)/returns",
   },
   {
     key: "favorites",
     label: "Favorites",
     caption: "Saved listings to shop later",
-    icon: "heart",
+    icon: "favorites",
     href: "/(customer)/favorites",
   },
   {
     key: "more",
     label: "More",
     caption: "Account, payments & notifications",
-    icon: "ellipsis-horizontal-circle",
+    icon: "more",
     href: "/(customer)/more",
   },
 ];
@@ -197,8 +199,8 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
                   onPress={() => go(item)}
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 12,
+                    alignItems: "center",
+                    gap: 10,
                     paddingVertical: 12,
                     paddingHorizontal: 12,
                     borderRadius: theme.radius.md,
@@ -211,12 +213,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
                       : theme.colors.background,
                   }}
                 >
-                  <Ionicons
-                    name={item.icon}
-                    size={22}
-                    color={theme.colors.primary}
-                    style={{ marginTop: 2 }}
-                  />
+                  <MenuIconTile name={item.icon} />
                   <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
                     <View
                       style={{
@@ -263,11 +260,11 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
                       {item.caption}
                     </ThemedText>
                   </View>
-                  <View style={{ marginTop: 2 }}>
+                  <View>
                     {active ? (
-                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                      <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
                     ) : (
-                      <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
                     )}
                   </View>
                 </PressableScale>
@@ -279,8 +276,8 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
               onPress={confirmSignOutFromMenu}
               style={{
                 flexDirection: "row",
-                alignItems: "flex-start",
-                gap: 12,
+                alignItems: "center",
+                gap: 10,
                 paddingVertical: 12,
                 paddingHorizontal: 12,
                 borderRadius: theme.radius.md,
@@ -291,7 +288,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
                 marginTop: 2,
               }}
             >
-              <Ionicons name="log-out" size={22} color={STATUS_ERROR} style={{ marginTop: 2 }} />
+              <MenuIconTile name="sign-out" variant="danger" />
               <View style={{ flex: 1, gap: 4 }}>
                 <ThemedText variant="label" style={{ color: STATUS_ERROR }}>
                   Sign out

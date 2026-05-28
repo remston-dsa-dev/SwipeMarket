@@ -4,6 +4,8 @@ import { useRouter, useSegments } from "expo-router";
 import type { Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderProfileAvatar } from "@/components/HeaderProfileAvatar";
+import type { HubMenuIconName } from "@/components/menu/HubMenuIcon";
+import { MenuIconTile } from "@/components/menu/MenuIconTile";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useSupplierReturns } from "@/hooks/useReturnRequests";
@@ -25,7 +27,7 @@ type MenuItem = {
   key: MenuKey;
   label: string;
   caption: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: HubMenuIconName;
   href: Href;
   /** Publish inventory is the partner home root — avoid stacking duplicates. */
   replace?: boolean;
@@ -38,7 +40,7 @@ const SUPPLIER_MENU: MenuItem[] = [
     key: "dashboard",
     label: "Publish Inventory",
     caption: "Listings, stock levels & pricing",
-    icon: "grid",
+    icon: "publish-inventory",
     href: "/(supplier)/dashboard",
     replace: true,
   },
@@ -46,7 +48,7 @@ const SUPPLIER_MENU: MenuItem[] = [
     key: "addProduct",
     label: "New listing",
     caption: "Photos, price & units for Discover",
-    icon: "add-circle",
+    icon: "add-listing",
     href: "/(supplier)/add-product",
     showCount: false,
   },
@@ -54,21 +56,21 @@ const SUPPLIER_MENU: MenuItem[] = [
     key: "orders",
     label: "Orders",
     caption: "Shopper checkouts & fulfillment",
-    icon: "receipt",
+    icon: "orders",
     href: "/(supplier)/orders",
   },
   {
     key: "returns",
     label: "Returns",
     caption: "Refunds & reverse logistics",
-    icon: "return-down-back",
+    icon: "returns",
     href: "/(supplier)/returns",
   },
   {
     key: "more",
     label: "More",
     caption: "Payouts, notifications & account",
-    icon: "ellipsis-horizontal-circle",
+    icon: "more",
     href: "/(supplier)/more",
     showCount: false,
   },
@@ -219,8 +221,8 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
                   onPress={() => go(item)}
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 12,
+                    alignItems: "center",
+                    gap: 10,
                     paddingVertical: 12,
                     paddingHorizontal: 12,
                     borderRadius: theme.radius.md,
@@ -233,12 +235,7 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
                       : theme.colors.background,
                   }}
                 >
-                  <Ionicons
-                    name={item.icon}
-                    size={22}
-                    color={theme.colors.primary}
-                    style={{ marginTop: 2 }}
-                  />
+                  <MenuIconTile name={item.icon} />
                   <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
                     <View
                       style={{
@@ -285,11 +282,11 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
                       {item.caption}
                     </ThemedText>
                   </View>
-                  <View style={{ marginTop: 2 }}>
+                  <View>
                     {active ? (
-                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                      <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
                     ) : (
-                      <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
                     )}
                   </View>
                 </PressableScale>
@@ -301,8 +298,8 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
               onPress={confirmSignOutFromMenu}
               style={{
                 flexDirection: "row",
-                alignItems: "flex-start",
-                gap: 12,
+                alignItems: "center",
+                gap: 10,
                 paddingVertical: 12,
                 paddingHorizontal: 12,
                 borderRadius: theme.radius.md,
@@ -313,7 +310,7 @@ export function SupplierHeaderActions({ avatarSize = 40 }: Props) {
                 marginTop: 2,
               }}
             >
-              <Ionicons name="log-out" size={22} color={STATUS_ERROR} style={{ marginTop: 2 }} />
+              <MenuIconTile name="sign-out" variant="danger" />
               <View style={{ flex: 1, gap: 4 }}>
                 <ThemedText variant="label" style={{ color: STATUS_ERROR }}>
                   Sign out

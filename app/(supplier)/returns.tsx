@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
+import { ReturnsEmptyState } from "@/components/order-card/ReturnsEmptyState";
 import { ReturnRequestsGroupedList } from "@/components/ReturnRequestsGroupedList";
 import {
   countReturnStatusFilters,
@@ -199,30 +200,19 @@ export default function SupplierReturnsScreen() {
         <ThemedText variant="body" style={{ color: "#EF4444" }}>
           {(error as Error).message}
         </ThemedText>
+      ) : returns.length === 0 ? (
+        <ReturnsEmptyState
+          variant="supplier"
+          kind="empty"
+          onPrimaryPress={() => router.push("/(supplier)/orders")}
+        />
       ) : sections.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", gap: 12 }}>
-          <ThemedText variant="body" color="muted">
-            {returns.length === 0
-              ? "No return requests yet. When shoppers request a return on a delivered item, they appear here grouped by shopper."
-              : "No return requests match this filter."}
-          </ThemedText>
-          {returns.length === 0 ? (
-            <PressableScale
-              onPress={() => router.push("/(supplier)/orders")}
-              style={{
-                alignSelf: "flex-start",
-                paddingHorizontal: 18,
-                paddingVertical: 12,
-                borderRadius: theme.radius.md,
-                backgroundColor: theme.colors.primary,
-              }}
-            >
-              <ThemedText variant="label" color="onPrimary">
-                View orders
-              </ThemedText>
-            </PressableScale>
-          ) : null}
-        </View>
+        <ReturnsEmptyState
+          variant="supplier"
+          kind="filtered"
+          statusFilter={statusFilter}
+          onClearFilter={() => setStatusFilter("all")}
+        />
       ) : (
         <FlatList
           data={sections}

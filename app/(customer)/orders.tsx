@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { ReturnRequestSheet, type ReturnRequestLine } from "@/components/ReturnRequestSheet";
 import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
+import { OrdersEmptyState } from "@/components/order-card/OrdersEmptyState";
 import { OrdersPartySectionHeader } from "@/components/order-card/OrdersPartySectionHeader";
 import { ShopperOrderCard } from "@/components/ShopperOrderCard";
 import { PressableScale } from "@/components/PressableScale";
@@ -16,6 +17,7 @@ import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import { isLineReturnEligible } from "@/lib/order-line";
 import { groupCustomerOrdersByPartner } from "@/lib/orders-by-party";
 import { createReturnRequest } from "@/lib/returns-remote";
+import { useCartStore } from "@/stores/cart-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -25,6 +27,11 @@ export default function CustomerOrdersScreen() {
   const theme = useTheme();
   const customerId = useSessionStore((s) => s.userId);
   const { data: orders = [], isPending, error } = useCustomerOrders(customerId);
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = useMemo(
+    () => cartItems.reduce((sum, i) => sum + i.qty, 0),
+    [cartItems],
+  );
   const [returnLine, setReturnLine] = useState<CustomerOrderItem | null>(null);
   const [returnSaving, setReturnSaving] = useState(false);
   const [returnBusyLineId, setReturnBusyLineId] = useState<string | null>(null);
@@ -121,27 +128,12 @@ export default function CustomerOrdersScreen() {
           {(error as Error).message}
         </ThemedText>
       ) : orders.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", gap: 10 }}>
-          <ThemedText variant="headline">No orders yet</ThemedText>
-          <ThemedText variant="body" color="muted">
-            After you check out from your cart, orders are grouped by partner with live status.
-          </ThemedText>
-          <PressableScale
-            onPress={() => router.replace("/(customer)/swipe")}
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 8,
-              paddingHorizontal: 18,
-              paddingVertical: 12,
-              borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.primary,
-            }}
-          >
-            <ThemedText variant="label" color="onPrimary">
-              Start shopping
-            </ThemedText>
-          </PressableScale>
-        </View>
+        <OrdersEmptyState
+          variant="shopper"
+          cartCount={cartCount}
+          onViewCart={() => router.push("/(customer)/matches")}
+          onPrimaryPress={() => router.replace("/(customer)/swipe")}
+        />
       ) : (
         <>
           <OrderStatusLegend />

@@ -3,8 +3,10 @@ import {
   AccessibilityInfo,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   Easing,
   FadeIn,
@@ -15,34 +17,34 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { emptyStateCtaEmoji, type HubMenuIconName } from "@/components/menu/HubMenuIcon";
 import { MenuIconTile } from "@/components/menu/MenuIconTile";
-import { SupplierInventoryActions } from "./SupplierInventoryActions";
+import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
-  onImportInventoryFile: () => void;
-  onDownloadTemplateCsv: () => void;
-  onDownloadTemplateXlsx: () => void;
-  onReviewTemplate: () => void;
+  onBrowseDiscover: () => void;
 };
 
 const COPY = {
-  title: "Your shelf is ready",
+  heroIcon: "favorites" as HubMenuIconName,
+  ctaIcon: "discover" as const,
+  title: "No favorites yet",
   subtitle:
-    "Import your full catalog from a .csv or .xlsx file—when you publish, shoppers see your products in Discover right away.",
+    "Save listings you love from Discover and find them here — quick to compare, share, and buy later.",
+  primaryLabel: "Browse Discover",
+  steps: [
+    "Swipe right on a listing you want to keep",
+    "Your saved items land here for easy access",
+    "Jump back to Discover anytime to add more",
+  ],
 } as const;
 
 /**
- * Empty inventory on the partner dashboard — same visual language as
- * `DiscoverEmptyState` (hero ring, sparkles, gradient primary CTA, outline secondaries).
+ * Empty favorites list — matches orders / returns empty states (3D hero, steps, gradient CTA).
  */
-export function SupplierInventoryEmptyState({
-  onDownloadTemplateCsv,
-  onDownloadTemplateXlsx,
-  onImportInventoryFile,
-  onReviewTemplate,
-}: Props) {
+export function FavoritesEmptyState({ onBrowseDiscover }: Props) {
   const theme = useTheme();
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -101,7 +103,7 @@ export function SupplierInventoryEmptyState({
     >
       <Animated.View entering={FadeIn.duration(500).delay(80)} style={styles.heroWrap}>
         <Animated.View style={heroFloatStyle}>
-          <MenuIconTile name="publish-inventory" size="hero" />
+          <MenuIconTile name={COPY.heroIcon} size="hero" />
         </Animated.View>
 
         <Animated.Text
@@ -127,14 +129,54 @@ export function SupplierInventoryEmptyState({
         </ThemedText>
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.duration(450).delay(200)} style={styles.actions}>
-        <SupplierInventoryActions
-          defaultTemplateExpanded
-          onImportInventoryFile={onImportInventoryFile}
-          onDownloadTemplateCsv={onDownloadTemplateCsv}
-          onDownloadTemplateXlsx={onDownloadTemplateXlsx}
-          onReviewTemplate={onReviewTemplate}
-        />
+      <Animated.View entering={FadeInDown.duration(450).delay(180)} style={styles.stepsBlock}>
+        {COPY.steps.map((step, index) => (
+          <View
+            key={step}
+            style={[
+              styles.stepRow,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.stepBadge,
+                { backgroundColor: theme.colors.overlay, borderColor: theme.colors.border },
+              ]}
+            >
+              <ThemedText variant="caption" color="primary" style={{ fontWeight: "700" }}>
+                {index + 1}
+              </ThemedText>
+            </View>
+            <ThemedText variant="caption" color="secondary" style={styles.stepText}>
+              {step}
+            </ThemedText>
+          </View>
+        ))}
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.duration(450).delay(260)} style={styles.actions}>
+        <PressableScale
+          accessibilityLabel={COPY.primaryLabel}
+          scaleOnPress={false}
+          onPress={onBrowseDiscover}
+          style={styles.ctaShadow}
+        >
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.ctaPrimary, styles.ctaWide]}
+          >
+            <Text style={styles.ctaEmoji}>{emptyStateCtaEmoji(COPY.ctaIcon)}</Text>
+            <ThemedText variant="label" color="onPrimary">
+              {COPY.primaryLabel}
+            </ThemedText>
+          </LinearGradient>
+        </PressableScale>
       </Animated.View>
     </ScrollView>
   );
@@ -145,7 +187,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 12,
     gap: 4,
   },
   heroWrap: {
@@ -178,9 +220,58 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
+  stepsBlock: {
+    width: "100%",
+    maxWidth: 400,
+    gap: 8,
+    marginTop: 16,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  stepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  stepText: {
+    flex: 1,
+    lineHeight: 18,
+  },
   actions: {
     width: "100%",
-    marginTop: 22,
+    maxWidth: 400,
+    gap: 12,
+    marginTop: 20,
     alignItems: "stretch",
   },
+  ctaShadow: {
+    borderRadius: 999,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.26,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
+  },
+  ctaPrimary: {
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  ctaWide: { alignSelf: "stretch" },
+  ctaEmoji: { fontSize: 18 },
 });

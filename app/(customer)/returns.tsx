@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
+import { ReturnsEmptyState } from "@/components/order-card/ReturnsEmptyState";
 import { ReturnRequestsGroupedList } from "@/components/ReturnRequestsGroupedList";
 import {
   countReturnStatusFilters,
@@ -128,32 +129,18 @@ export default function CustomerReturnsScreen() {
           {(error as Error).message}
         </ThemedText>
       ) : returns.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", gap: 12 }}>
-          <ThemedText variant="body" color="muted">
-            No return requests yet. Open a delivered order and tap Request return / refund on an
-            eligible product line.
-          </ThemedText>
-          <PressableScale
-            onPress={() => router.push("/(customer)/orders")}
-            style={{
-              alignSelf: "flex-start",
-              paddingHorizontal: 18,
-              paddingVertical: 12,
-              borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.primary,
-            }}
-          >
-            <ThemedText variant="label" color="onPrimary">
-              View my orders
-            </ThemedText>
-          </PressableScale>
-        </View>
+        <ReturnsEmptyState
+          variant="shopper"
+          kind="empty"
+          onPrimaryPress={() => router.push("/(customer)/orders")}
+        />
       ) : orderGroups.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <ThemedText variant="body" color="muted">
-            No return requests match this filter.
-          </ThemedText>
-        </View>
+        <ReturnsEmptyState
+          variant="shopper"
+          kind="filtered"
+          statusFilter={statusFilter}
+          onClearFilter={() => setStatusFilter("all")}
+        />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
           <ReturnRequestsGroupedList
