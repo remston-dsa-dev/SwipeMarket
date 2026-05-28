@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
-import { ReturnRequestCard } from "@/components/ReturnRequestCard";
+import { ReturnRequestsGroupedList } from "@/components/ReturnRequestsGroupedList";
 import {
   countReturnStatusFilters,
   ReturnStatusFilterChips,
@@ -14,9 +14,11 @@ import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { ThemedText } from "@/components/ThemedText";
+import { useReturnsScreenRealtime } from "@/hooks/useReturnsScreenRealtime";
 import { useSupplierReturns, type ReturnRequestRow } from "@/hooks/useReturnRequests";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
 import type { ReturnResolution } from "@/lib/return-resolution";
+import { groupReturnRequestsByOrder } from "@/lib/return-list-grouping";
 import { resolveReturnRequest } from "@/lib/returns-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -48,7 +50,8 @@ export default function SupplierReturnsScreen() {
   const queryClient = useQueryClient();
   const theme = useTheme();
   const supplierId = useSessionStore((s) => s.userId);
-  const { data: returns = [], isPending, error } = useSupplierReturns(supplierId);
+  const { data: returns = [], isPending, error, isFetching } = useSupplierReturns(supplierId);
+  useReturnsScreenRealtime("supplier", supplierId);
   const [statusFilter, setStatusFilter] = useState<ReturnStatusFilter>("all");
   const [resolveTarget, setResolveTarget] = useState<ReturnResolveTarget | null>(null);
   const [resolveBusyId, setResolveBusyId] = useState<string | null>(null);
@@ -74,23 +77,23 @@ export default function SupplierReturnsScreen() {
     }
     return Array.from(byCustomer.entries())
       .map(([customerId, list]) => {
-        const sorted = [...list].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        );
-        const pending = sorted.filter((r) => r.status === "requested").length;
+        const orderGroups = groupReturnRequestsByOrder(list);
+        const pending = list.filter((r) => r.status === "requested").length;
+        const first = list[0]!;
         return {
           customerId,
-          party: shopperParty(sorted[0]!),
-          title: shopperLabel(sorted[0]!),
+          party: shopperParty(first),
+          title: shopperLabel(first),
           pending,
-          data: sorted,
+          orderGroups,
+          requestCount: list.length,
         };
       })
       .sort((a, b) => {
         if (a.pending !== b.pending) return b.pending - a.pending;
-        return (
-          new Date(b.data[0]!.created_at).getTime() - new Date(a.data[0]!.created_at).getTime()
-        );
+        const aLatest = a.orderGroups[0]?.latestAt ?? "";
+        const bLatest = b.orderGroups[0]?.latestAt ?? "";
+        return new Date(bLatest).getTime() - new Date(aLatest).getTime();
       });
   }, [filteredReturns]);
 
@@ -113,8 +116,8 @@ export default function SupplierReturnsScreen() {
     setResolveBusyId(resolveTarget.requestId);
     try {
       await resolveReturnRequest(resolveTarget.requestId, resolution, refundCents, note);
-      void queryClient.invalidateQueries({ queryKey: ["supplier-returns", supplierId] });
-      void queryClient.invalidateQueries({ queryKey: ["supplier-orders", supplierId] });
+      void queryClient.refetchQueries({ queryKey: ["supplier-returns", supplierId] });
+      void queryClient.refetchQueries({ queryKey: ["supplier-orders", supplierId] });
       void queryClient.invalidateQueries({ queryKey: ["customer-returns"] });
       setResolveTarget(null);
       Alert.alert("Return resolved", "The shopper will see your decision on this request.");
@@ -160,12 +163,25 @@ export default function SupplierReturnsScreen() {
         <SupplierHeaderActions />
       </View>
 
-      <ThemedText variant="caption" color="muted" style={{ marginBottom: 12 }}>
-        {pendingTotal > 0
-          ? `${pendingTotal} request${pendingTotal === 1 ? "" : "s"} need your review.`
-          : "All return requests are resolved."}{" "}
-        Grouped by shopper below.
-      </ThemedText>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          gap: 8,
+        }}
+      >
+        <ThemedText variant="caption" color="muted" style={{ flex: 1 }}>
+          {pendingTotal > 0
+            ? `${pendingTotal} request${pendingTotal === 1 ? "" : "s"} need your review.`
+            : "All return requests are resolved."}{" "}
+          Grouped by shopper, order, and line — updates live.
+        </ThemedText>
+        {isFetching && !isPending ? (
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        ) : null}
+      </View>
 
       {returns.length > 0 ? (
         <ReturnStatusFilterChips
@@ -212,30 +228,30 @@ export default function SupplierReturnsScreen() {
           data={sections}
           keyExtractor={(s) => s.customerId}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 24, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: 32 }}
           renderItem={({ item: section }) => (
-            <View style={{ gap: 12 }}>
-              <View style={{ gap: 8 }}>
+            <View
+              style={{
+                marginBottom: 20,
+                paddingBottom: 20,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
+              }}
+            >
+              <View style={{ gap: 4, marginBottom: 14 }}>
                 <OrderPartyBadge party={section.party} />
                 <ThemedText variant="caption" color="muted">
-                  {section.data.length} request{section.data.length === 1 ? "" : "s"}
-                  {section.pending > 0
-                    ? ` · ${section.pending} pending`
-                    : ""}
+                  {section.orderGroups.length} order{section.orderGroups.length === 1 ? "" : "s"} ·{" "}
+                  {section.requestCount} request{section.requestCount === 1 ? "" : "s"}
+                  {section.pending > 0 ? ` · ${section.pending} pending` : ""}
                 </ThemedText>
               </View>
-              {section.data.map((request) => (
-                <ReturnRequestCard
-                  key={request.id}
-                  request={request}
-                  role="supplier"
-                  hidePartyBadge
-                  busy={resolveBusyId === request.id}
-                  onResolve={
-                    request.status === "requested" ? () => openResolve(request) : undefined
-                  }
-                />
-              ))}
+              <ReturnRequestsGroupedList
+                orderGroups={section.orderGroups}
+                role="supplier"
+                resolveBusyId={resolveBusyId}
+                onResolve={(request) => openResolve(request)}
+              />
             </View>
           )}
         />

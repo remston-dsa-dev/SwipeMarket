@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
-import { ReturnRequestCard } from "@/components/ReturnRequestCard";
+import { ReturnRequestsGroupedList } from "@/components/ReturnRequestsGroupedList";
 import {
   countReturnStatusFilters,
   ReturnStatusFilterChips,
@@ -12,8 +12,10 @@ import {
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
+import { useReturnsScreenRealtime } from "@/hooks/useReturnsScreenRealtime";
 import { useCustomerReturns } from "@/hooks/useReturnRequests";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { groupReturnRequestsByOrder } from "@/lib/return-list-grouping";
 import { cancelReturnRequest } from "@/lib/returns-remote";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
@@ -23,7 +25,8 @@ export default function CustomerReturnsScreen() {
   const queryClient = useQueryClient();
   const theme = useTheme();
   const customerId = useSessionStore((s) => s.userId);
-  const { data: returns = [], isPending, error } = useCustomerReturns(customerId);
+  const { data: returns = [], isPending, error, isFetching } = useCustomerReturns(customerId);
+  useReturnsScreenRealtime("customer", customerId);
   const [statusFilter, setStatusFilter] = useState<ReturnStatusFilter>("all");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
@@ -37,13 +40,18 @@ export default function CustomerReturnsScreen() {
     return returns.filter((r) => r.status === statusFilter);
   }, [returns, statusFilter]);
 
+  const orderGroups = useMemo(
+    () => groupReturnRequestsByOrder(filteredReturns),
+    [filteredReturns],
+  );
+
   async function handleCancel(requestId: string) {
     if (!customerId) return;
     setCancellingId(requestId);
     try {
       await cancelReturnRequest(requestId);
-      void queryClient.invalidateQueries({ queryKey: ["customer-returns", customerId] });
-      void queryClient.invalidateQueries({ queryKey: ["customer-orders", customerId] });
+      void queryClient.refetchQueries({ queryKey: ["customer-returns", customerId] });
+      void queryClient.refetchQueries({ queryKey: ["customer-orders", customerId] });
     } catch (e) {
       Alert.alert("Could not cancel", (e as Error).message);
     } finally {
@@ -86,10 +94,22 @@ export default function CustomerReturnsScreen() {
         <CustomerHeaderActions />
       </View>
 
-      <ThemedText variant="caption" color="muted" style={{ marginBottom: 12 }}>
-        Request returns from My Orders on delivered items. Each partner reviews and resolves with
-        their chosen refund outcome.
-      </ThemedText>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          gap: 8,
+        }}
+      >
+        <ThemedText variant="caption" color="muted" style={{ flex: 1 }}>
+          Grouped by order and product line. Updates live when your partner responds.
+        </ThemedText>
+        {isFetching && !isPending ? (
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        ) : null}
+      </View>
 
       {returns.length > 0 ? (
         <ReturnStatusFilterChips
@@ -128,31 +148,30 @@ export default function CustomerReturnsScreen() {
             </ThemedText>
           </PressableScale>
         </View>
-      ) : filteredReturns.length === 0 ? (
+      ) : orderGroups.length === 0 ? (
         <View style={{ flex: 1, justifyContent: "center" }}>
           <ThemedText variant="body" color="muted">
             No return requests match this filter.
           </ThemedText>
         </View>
       ) : (
-        <FlatList
-          data={filteredReturns}
-          keyExtractor={(r) => r.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 12, paddingBottom: 32 }}
-          renderItem={({ item }) => (
-            <ReturnRequestCard
-              request={item}
-              role="customer"
-              busy={cancellingId === item.id}
-              onCancel={
-                item.status === "requested"
-                  ? () => void handleCancel(item.id)
-                  : undefined
-              }
-            />
-          )}
-        />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          <ReturnRequestsGroupedList
+            orderGroups={orderGroups}
+            role="customer"
+            cancellingId={cancellingId}
+            orderParty={(order) => {
+              const first = order.lineGroups[0]?.requests[0];
+              if (!first) return null;
+              return {
+                name: first.supplier?.full_name ?? "",
+                avatarUrl: first.supplier?.avatar_url ?? null,
+                fallbackLabel: "Partner",
+              };
+            }}
+            onCancel={(id) => void handleCancel(id)}
+          />
+        </ScrollView>
       )}
     </Screen>
   );

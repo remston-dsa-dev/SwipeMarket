@@ -17,6 +17,7 @@ async function fetchListings(): Promise<Listing[]> {
     )
     .eq("published", true)
     .gt("available_units", 0)
+    .gt("available_units", 0)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -28,7 +29,6 @@ async function fetchListings(): Promise<Listing[]> {
 export function useListings() {
   const enabled = isSupabaseConfigured();
   const queryClient = useQueryClient();
-
   const query = useQuery({
     queryKey: ["listings"],
     queryFn: fetchListings,

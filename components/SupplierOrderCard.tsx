@@ -12,6 +12,7 @@ import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { SupplierOrder, SupplierOrderItem } from "@/hooks/useSupplierOrders";
+import { formatOrderLabel } from "@/lib/order-label";
 import {
   getShopperOrderDisplayStatus,
   isLineReturnEligible,
@@ -23,6 +24,8 @@ import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   order: SupplierOrder;
+  /** Section header already shows shopper profile. */
+  hidePartyBadge?: boolean;
   orderStatusBusy?: boolean;
   lineStatusBusyId?: string | null;
   onChangeOrderStatus: () => void;
@@ -33,6 +36,7 @@ type Props = {
 
 export function SupplierOrderCard({
   order,
+  hidePartyBadge = false,
   orderStatusBusy,
   lineStatusBusyId,
   onChangeOrderStatus,
@@ -80,13 +84,18 @@ export function SupplierOrderCard({
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1, gap: 6 }}>
-          <OrderPartyBadge
-            party={{
-              name: order.customer?.full_name ?? "",
-              avatarUrl: order.customer?.avatar_url ?? null,
-              fallbackLabel: "Shopper",
-            }}
-          />
+          <ThemedText variant="label" style={{ fontWeight: "700" }}>
+            {formatOrderLabel(order.id)}
+          </ThemedText>
+          {hidePartyBadge ? null : (
+            <OrderPartyBadge
+              party={{
+                name: order.customer?.full_name ?? "",
+                avatarUrl: order.customer?.avatar_url ?? null,
+                fallbackLabel: "Shopper",
+              }}
+            />
+          )}
           <ThemedText variant="caption" color="muted">
             {when}
           </ThemedText>

@@ -27,7 +27,7 @@ type MenuItem = {
   caption: string;
   icon: keyof typeof Ionicons.glyphMap;
   href: Href;
-  /** Dashboard is the partner home root — avoid stacking duplicates. */
+  /** Publish inventory is the partner home root — avoid stacking duplicates. */
   replace?: boolean;
   /** When false, no count chip (e.g. quick actions, settings hub). */
   showCount?: boolean;
@@ -36,7 +36,7 @@ type MenuItem = {
 const SUPPLIER_MENU: MenuItem[] = [
   {
     key: "dashboard",
-    label: "Dashboard",
+    label: "Publish Inventory",
     caption: "Listings, stock levels & pricing",
     icon: "grid",
     href: "/(supplier)/dashboard",

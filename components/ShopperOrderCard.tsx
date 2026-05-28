@@ -12,12 +12,15 @@ import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
 import { OrderStatusTimeline } from "@/components/order-card/OrderStatusTimeline";
 import type { CustomerOrder } from "@/hooks/useCustomerOrders";
+import { formatOrderLabel } from "@/lib/order-label";
 import { getShopperOrderDisplayStatus, orderLineTotals, orderSummaryLabel } from "@/lib/order-line";
 import { useTheme } from "@/theme/ThemeContext";
 
 type Props = {
   order: CustomerOrder;
   warrantyNow: number;
+  /** Section header already shows partner profile. */
+  hidePartyBadge?: boolean;
   onRequestReturn?: (line: CustomerOrder["order_items"][number]) => void;
   returnBusyLineId?: string | null;
 };
@@ -25,11 +28,17 @@ type Props = {
 export const ShopperOrderCard = memo(function ShopperOrderCard({
   order,
   warrantyNow,
+  hidePartyBadge = false,
   onRequestReturn,
   returnBusyLineId,
 }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const [returnFoldOpenLineIds, setReturnFoldOpenLineIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const linesUnclipped = expanded || returnFoldOpenLineIds.size > 0;
 
   const when = new Date(order.created_at).toLocaleString(undefined, {
     month: "short",
@@ -62,18 +71,23 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
         padding: 16,
         gap: 12,
         backgroundColor: theme.colors.surface,
-        minHeight: expanded ? undefined : COLLAPSED_CARD_MIN_HEIGHT,
+        minHeight: linesUnclipped ? undefined : COLLAPSED_CARD_MIN_HEIGHT,
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1, gap: 6 }}>
-          <OrderPartyBadge
-            party={{
-              name: order.supplier?.full_name ?? "",
-              avatarUrl: order.supplier?.avatar_url ?? null,
-              fallbackLabel: "Partner",
-            }}
-          />
+          <ThemedText variant="label" style={{ fontWeight: "700" }}>
+            {formatOrderLabel(order.id)}
+          </ThemedText>
+          {hidePartyBadge ? null : (
+            <OrderPartyBadge
+              party={{
+                name: order.supplier?.full_name ?? "",
+                avatarUrl: order.supplier?.avatar_url ?? null,
+                fallbackLabel: "Partner",
+              }}
+            />
+          )}
           <ThemedText variant="caption" color="muted">
             {when}
           </ThemedText>
@@ -90,8 +104,8 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
       <View
         style={{
           gap: 10,
-          maxHeight: expanded ? undefined : COLLAPSED_LINES_MAX_HEIGHT,
-          overflow: expanded ? "visible" : "hidden",
+          maxHeight: linesUnclipped ? undefined : COLLAPSED_LINES_MAX_HEIGHT,
+          overflow: linesUnclipped ? "visible" : "hidden",
         }}
       >
         {visibleLines.map((line) => (
@@ -103,6 +117,15 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
               onRequestReturn ? () => onRequestReturn(line) : undefined
             }
             returnBusy={returnBusyLineId === line.id}
+            onReturnFoldExpandedChange={(open) => {
+              setReturnFoldOpenLineIds((prev) => {
+                const next = new Set(prev);
+                if (open) next.add(line.id);
+                else next.delete(line.id);
+                return next;
+              });
+              if (open) setExpanded(true);
+            }}
           />
         ))}
       </View>

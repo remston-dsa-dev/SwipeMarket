@@ -107,6 +107,8 @@ export function useCustomerReturns(customerId: string | null) {
     queryFn: () => fetchCustomerReturns(customerId!),
     enabled,
     staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
   });
 }
 
@@ -119,5 +121,7 @@ export function useSupplierReturns(supplierId: string | null) {
     queryFn: () => fetchSupplierReturns(supplierId!),
     enabled,
     staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
   });
 }

@@ -6,6 +6,7 @@ import { OrderStatusPickerSheet } from "@/components/OrderStatusPickerSheet";
 import { ReturnResolutionSheet } from "@/components/ReturnResolutionSheet";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
+import { OrdersPartySectionHeader } from "@/components/order-card/OrdersPartySectionHeader";
 import { SupplierOrderCard } from "@/components/SupplierOrderCard";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
@@ -16,14 +17,9 @@ import type { OrderStatus } from "@/lib/order-status";
 import type { ReturnResolution } from "@/lib/return-resolution";
 import { supplierSetOrderItemStatus, supplierSetOrderStatus } from "@/lib/orders-remote";
 import { resolveReturnRequest } from "@/lib/returns-remote";
+import { groupSupplierOrdersByShopper } from "@/lib/orders-by-party";
 import { useSessionStore } from "@/stores/session-store";
 import { useTheme } from "@/theme/ThemeContext";
-
-function shopperLabel(order: SupplierOrder): string {
-  const n = order.customer?.full_name?.trim();
-  if (n) return n;
-  return `Shopper · ${order.customer_id.slice(0, 8)}…`;
-}
 
 type StatusTarget =
   | { kind: "order"; order: SupplierOrder }
@@ -52,26 +48,7 @@ export default function SupplierOrdersScreen() {
   const [returnTarget, setReturnTarget] = useState<ReturnResolveTarget | null>(null);
   const [resolveReturnBusyId, setResolveReturnBusyId] = useState<string | null>(null);
 
-  const sections = useMemo(() => {
-    const byCustomer = new Map<string, SupplierOrder[]>();
-    for (const o of orders) {
-      const list = byCustomer.get(o.customer_id) ?? [];
-      list.push(o);
-      byCustomer.set(o.customer_id, list);
-    }
-    return Array.from(byCustomer.entries())
-      .map(([customerId, list]) => ({
-        customerId,
-        title: shopperLabel(list[0]!),
-        data: [...list].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        ),
-      }))
-      .sort(
-        (a, b) =>
-          new Date(b.data[0]!.created_at).getTime() - new Date(a.data[0]!.created_at).getTime(),
-      );
-  }, [orders]);
+  const sections = useMemo(() => groupSupplierOrdersByShopper(orders), [orders]);
 
   function openReturnResolve(requestId: string, line: SupplierOrderItem) {
     const pending = line.return_requests.find((r) => r.id === requestId);
@@ -185,8 +162,8 @@ export default function SupplierOrdersScreen() {
         <View style={{ flex: 1, justifyContent: "center", gap: 10 }}>
           <ThemedText variant="headline">No orders yet</ThemedText>
           <ThemedText variant="body" color="muted">
-            When shoppers check out items from your catalog, each order appears here. Tap a product
-            status to update it individually, or the order badge to update every product at once.
+            Orders are grouped by shopper. Tap a product status to update it, or the order badge to
+            update every product at once.
           </ThemedText>
         </View>
       ) : (
@@ -194,18 +171,25 @@ export default function SupplierOrdersScreen() {
           <OrderStatusLegend />
           <FlatList
             data={sections}
-            keyExtractor={(s) => s.customerId}
+            keyExtractor={(s) => s.partyId}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ gap: 24, paddingBottom: 32 }}
             renderItem={({ item: section }) => (
-              <View style={{ gap: 12 }}>
-                <ThemedText variant="label" color="secondary">
-                  {section.title}
-                </ThemedText>
-                {section.data.map((order) => (
+              <View
+                style={{
+                  paddingBottom: 20,
+                  marginBottom: 4,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.colors.border,
+                }}
+              >
+                <OrdersPartySectionHeader party={section.party} orderCount={section.orders.length} />
+                <View style={{ gap: 12 }}>
+                  {section.orders.map((order) => (
                   <SupplierOrderCard
                     key={order.id}
                     order={order}
+                    hidePartyBadge
                     orderStatusBusy={savingKey === `order:${order.id}`}
                     lineStatusBusyId={
                       savingKey?.startsWith("item:") ? savingKey.slice(5) : null
@@ -223,7 +207,8 @@ export default function SupplierOrdersScreen() {
                       })
                     }
                   />
-                ))}
+                  ))}
+                </View>
               </View>
             )}
           />

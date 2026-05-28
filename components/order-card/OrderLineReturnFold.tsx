@@ -35,6 +35,7 @@ type Props = {
   warrantyNow: number;
   onRequestReturn?: () => void;
   returnBusy?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 type FoldTone = "eligible" | "pending" | "resolved" | "ended";
@@ -163,9 +164,15 @@ export function OrderLineReturnFold({
   warrantyNow,
   onRequestReturn,
   returnBusy,
+  onExpandedChange,
 }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
+
+  function setFoldExpanded(next: boolean) {
+    setExpanded(next);
+    onExpandedChange?.(next);
+  }
   const now = warrantyNow;
 
   const warranty = useMemo(
@@ -209,7 +216,7 @@ export function OrderLineReturnFold({
             ? `Collapse return details for ${productTitle}`
             : `Expand return details for ${productTitle}, ${fold.primary}`
         }
-        onPress={() => setExpanded((v) => !v)}
+        onPress={() => setFoldExpanded(!expanded)}
         style={{
           flexDirection: "row",
           alignItems: "flex-start",

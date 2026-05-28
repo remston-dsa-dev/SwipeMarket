@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { refetchReturnsForCustomer } from "@/lib/returns-realtime-sync";
 import { uniqueRealtimeTopic } from "@/lib/realtime-unique-topic";
 import { supabase } from "@/lib/supabase";
 
@@ -11,9 +12,8 @@ export function useCustomerRealtime(customerId: string | null) {
   useEffect(() => {
     if (!customerId || !isSupabaseConfigured()) return;
 
-    const invalidate = () => {
-      void queryClient.invalidateQueries({ queryKey: ["customer-orders", customerId] });
-      void queryClient.invalidateQueries({ queryKey: ["customer-returns", customerId] });
+    const refresh = () => {
+      refetchReturnsForCustomer(queryClient, customerId);
     };
 
     const channel = supabase
@@ -26,7 +26,7 @@ export function useCustomerRealtime(customerId: string | null) {
           table: "return_requests",
           filter: `customer_id=eq.${customerId}`,
         },
-        invalidate,
+        refresh,
       )
       .on(
         "postgres_changes",
@@ -36,7 +36,16 @@ export function useCustomerRealtime(customerId: string | null) {
           table: "orders",
           filter: `customer_id=eq.${customerId}`,
         },
-        invalidate,
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "order_items",
+        },
+        refresh,
       )
       .subscribe();
 

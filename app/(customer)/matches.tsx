@@ -124,6 +124,7 @@ export default function CartScreen() {
                 Alert.alert("Clear cart?", "Remove all items?", [
                   { text: "Cancel", style: "cancel" },
                   { text: "Clear", style: "destructive", onPress: () => void clearEntireCart() },
+                  { text: "Clear", style: "destructive", onPress: () => void clearEntireCart() },
                 ])
               }
               style={{

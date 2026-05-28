@@ -34,6 +34,7 @@ type Props = {
   statusBusy?: boolean;
   onRequestReturn?: () => void;
   returnBusy?: boolean;
+  onReturnFoldExpandedChange?: (expanded: boolean) => void;
 };
 
 export const OrderLineRow = memo(function OrderLineRow({
@@ -43,6 +44,7 @@ export const OrderLineRow = memo(function OrderLineRow({
   statusBusy,
   onRequestReturn,
   returnBusy,
+  onReturnFoldExpandedChange,
 }: Props) {
   const theme = useTheme();
   const shopperReturns = onRequestReturn !== undefined;
@@ -114,6 +116,7 @@ export const OrderLineRow = memo(function OrderLineRow({
             warrantyNow={warrantyNow}
             onRequestReturn={onRequestReturn}
             returnBusy={returnBusy}
+            onExpandedChange={onReturnFoldExpandedChange}
           />
       ) : null}
     </View>
