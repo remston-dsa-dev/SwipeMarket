@@ -1,5 +1,4 @@
 import { View } from "react-native";
-import { useRouter } from "expo-router";
 import { SupplierHeaderActions } from "@/components/SupplierHeaderActions";
 import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
@@ -13,7 +12,6 @@ const PLACEHOLDER_LINKS = [
 ] as const;
 
 export default function SupplierMoreScreen() {
-  const router = useRouter();
   const theme = useTheme();
 
   return (
@@ -26,18 +24,9 @@ export default function SupplierMoreScreen() {
           marginBottom: 20,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-          <PressableScale
-            accessibilityLabel="Back"
-            onPress={() => router.back()}
-            style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-          >
-            <ThemedText variant="label">← Back</ThemedText>
-          </PressableScale>
-          <ThemedText variant="headline" numberOfLines={1} style={{ flex: 1 }}>
-            More
-          </ThemedText>
-        </View>
+        <ThemedText variant="headline" numberOfLines={1} style={{ flex: 1 }}>
+          More
+        </ThemedText>
         <SupplierHeaderActions />
       </View>
 

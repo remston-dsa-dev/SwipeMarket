@@ -9,7 +9,6 @@ import { OrderStatusLegend } from "@/components/order-card/OrderStatusLegend";
 import { OrdersEmptyState } from "@/components/order-card/OrdersEmptyState";
 import { OrdersPartySectionHeader } from "@/components/order-card/OrdersPartySectionHeader";
 import { SupplierOrderCard } from "@/components/SupplierOrderCard";
-import { PressableScale } from "@/components/PressableScale";
 import { Screen } from "@/components/Screen";
 import { ThemedText } from "@/components/ThemedText";
 import { useSupplierOrders, type SupplierOrder, type SupplierOrderItem } from "@/hooks/useSupplierOrders";
@@ -133,21 +132,9 @@ export default function SupplierOrdersScreen() {
           marginBottom: 20,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-          <PressableScale
-            accessibilityLabel="Back to inventory"
-            onPress={() => router.back()}
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 4,
-            }}
-          >
-            <ThemedText variant="label">← Back</ThemedText>
-          </PressableScale>
-          <ThemedText variant="headline" numberOfLines={1} style={{ flex: 1 }}>
-            Orders
-          </ThemedText>
-        </View>
+        <ThemedText variant="headline" numberOfLines={1} style={{ flex: 1 }}>
+          Orders
+        </ThemedText>
         <SupplierHeaderActions />
       </View>
 

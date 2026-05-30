@@ -1,6 +1,8 @@
 import { Text, type TextStyle } from "react-native";
 
 export type HubMenuIconName =
+  | "cart"
+  | "discover"
   | "orders"
   | "returns"
   | "favorites"
@@ -10,6 +12,8 @@ export type HubMenuIconName =
   | "sign-out";
 
 const EMOJI: Record<HubMenuIconName, string> = {
+  cart: "🛒",
+  discover: "🛍️",
   orders: "📦",
   returns: "↩️",
   favorites: "❤️",
@@ -42,15 +46,10 @@ export function hubMenuEmoji(name: HubMenuIconName): string {
   return EMOJI[name];
 }
 
-/** Empty-state CTA targets (hub routes + Discover swipe, which has no menu item). */
-export type EmptyStateCtaIcon = HubMenuIconName | "discover";
-
-const CTA_EXTRA_EMOJI: Record<"discover", string> = {
-  discover: "🛍️",
-};
+/** Empty-state CTA targets — use the destination screen’s hub icon. */
+export type EmptyStateCtaIcon = HubMenuIconName;
 
 /** Emoji for an empty-state button — use the destination screen’s icon, not the current screen. */
 export function emptyStateCtaEmoji(icon: EmptyStateCtaIcon): string {
-  if (icon === "discover") return CTA_EXTRA_EMOJI.discover;
   return EMOJI[icon];
 }

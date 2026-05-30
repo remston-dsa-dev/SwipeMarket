@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { AuthInput } from "@/components/AuthInput";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
@@ -72,16 +71,6 @@ export default function ForgotPasswordScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.backRow}>
-          <PressableScale
-            accessibilityLabel="Back"
-            onPress={() => router.back()}
-            style={styles.backBtn}
-          >
-            <Ionicons name="arrow-back" size={22} color={theme.colors.textPrimary} />
-          </PressableScale>
-        </View>
-
         <View style={styles.content}>
           <ThemedText variant="title">Reset password</ThemedText>
           <ThemedText variant="body" color="muted" style={{ marginTop: 8, marginBottom: 24 }}>
@@ -120,8 +109,6 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  backRow: { paddingHorizontal: 20, paddingTop: 8 },
-  backBtn: { alignSelf: "flex-start", padding: 4 },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
   cta: { marginTop: 24, borderRadius: 999, paddingVertical: 18, alignItems: "center" },
 });

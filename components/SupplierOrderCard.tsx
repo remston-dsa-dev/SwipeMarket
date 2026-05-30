@@ -2,11 +2,7 @@ import { useMemo, useState } from "react";
 import { View } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import {
-  COLLAPSED_CARD_MIN_HEIGHT,
-  COLLAPSED_LINES_MAX_HEIGHT,
-  PREVIEW_LINE_COUNT,
-} from "@/components/order-card/constants";
+import { PREVIEW_LINE_COUNT } from "@/components/order-card/constants";
 import { OrderLineRow } from "@/components/order-card/OrderLineRow";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
@@ -79,7 +75,6 @@ export function SupplierOrderCard({
         padding: 16,
         gap: 12,
         backgroundColor: theme.colors.surface,
-        minHeight: expanded ? undefined : COLLAPSED_CARD_MIN_HEIGHT,
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -131,17 +126,11 @@ export function SupplierOrderCard({
         </View>
       )}
 
-      <View
-        style={{
-          gap: 10,
-          maxHeight: expanded ? undefined : COLLAPSED_LINES_MAX_HEIGHT,
-          overflow: expanded ? "visible" : "hidden",
-        }}
-      >
+      <View style={{ gap: 10 }}>
         {visibleLines.map((line) => {
           const pending = line.return_requests.find((r) => r.status === "requested");
           return (
-            <View key={line.id} style={{ gap: 8 }}>
+            <View key={`${line.id}-${expanded ? "expanded" : "collapsed"}`} style={{ gap: 8 }}>
               <OrderLineRow
                 line={line}
                 onStatusPress={() => onChangeLineStatus(line)}

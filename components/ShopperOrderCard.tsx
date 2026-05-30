@@ -2,11 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { View } from "react-native";
 import { PressableScale } from "@/components/PressableScale";
 import { ThemedText } from "@/components/ThemedText";
-import {
-  COLLAPSED_CARD_MIN_HEIGHT,
-  COLLAPSED_LINES_MAX_HEIGHT,
-  PREVIEW_LINE_COUNT,
-} from "@/components/order-card/constants";
+import { PREVIEW_LINE_COUNT } from "@/components/order-card/constants";
 import { OrderLineRow } from "@/components/order-card/OrderLineRow";
 import { OrderPartyBadge } from "@/components/order-card/OrderPartyBadge";
 import { OrderStatusBadge } from "@/components/order-card/OrderStatusBadge";
@@ -34,11 +30,6 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
 }: Props) {
   const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const [returnFoldOpenLineIds, setReturnFoldOpenLineIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-
-  const linesUnclipped = expanded || returnFoldOpenLineIds.size > 0;
 
   const when = new Date(order.created_at).toLocaleString(undefined, {
     month: "short",
@@ -71,7 +62,6 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
         padding: 16,
         gap: 12,
         backgroundColor: theme.colors.surface,
-        minHeight: linesUnclipped ? undefined : COLLAPSED_CARD_MIN_HEIGHT,
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -101,16 +91,10 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
 
       <OrderStatusTimeline status={order.status} />
 
-      <View
-        style={{
-          gap: 10,
-          maxHeight: linesUnclipped ? undefined : COLLAPSED_LINES_MAX_HEIGHT,
-          overflow: linesUnclipped ? "visible" : "hidden",
-        }}
-      >
+      <View style={{ gap: 10 }}>
         {visibleLines.map((line) => (
           <OrderLineRow
-            key={line.id}
+            key={`${line.id}-${expanded ? "expanded" : "collapsed"}`}
             line={line}
             warrantyNow={warrantyNow}
             onRequestReturn={
@@ -118,19 +102,13 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
             }
             returnBusy={returnBusyLineId === line.id}
             onReturnFoldExpandedChange={(open) => {
-              setReturnFoldOpenLineIds((prev) => {
-                const next = new Set(prev);
-                if (open) next.add(line.id);
-                else next.delete(line.id);
-                return next;
-              });
               if (open) setExpanded(true);
             }}
           />
         ))}
       </View>
 
-      {hiddenCount > 0 && (
+      {hiddenCount > 0 ? (
         <PressableScale
           accessibilityLabel={expanded ? "Show fewer items" : `Show ${hiddenCount} more items`}
           onPress={() => setExpanded((v) => !v)}
@@ -144,7 +122,7 @@ export const ShopperOrderCard = memo(function ShopperOrderCard({
             {expanded ? "Show less" : `Show ${hiddenCount} more`}
           </ThemedText>
         </PressableScale>
-      )}
+      ) : null}
     </View>
   );
 });

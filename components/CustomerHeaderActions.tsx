@@ -20,7 +20,7 @@ type Props = {
   avatarSize?: number;
 };
 
-type MenuKey = "orders" | "returns" | "favorites" | "more";
+type MenuKey = "discover" | "orders" | "returns" | "favorites" | "more";
 
 type MenuItem = {
   key: MenuKey;
@@ -28,9 +28,19 @@ type MenuItem = {
   caption: string;
   icon: HubMenuIconName;
   href: Href;
+  /** Discover is the shopper home root — avoid stacking duplicates. */
+  replace?: boolean;
 };
 
 const SHOPPER_MENU: MenuItem[] = [
+  {
+    key: "discover",
+    label: "Start Shopping",
+    caption: "Swipe listings and add to your cart",
+    icon: "discover",
+    href: "/(customer)/swipe",
+    replace: true,
+  },
   {
     key: "orders",
     label: "My Orders",
@@ -63,7 +73,7 @@ const SHOPPER_MENU: MenuItem[] = [
 
 const SIGN_OUT_CAPTION = "End this session on this device";
 
-/** Avatar menu: orders, returns, favorites, more, sign out. Green dot = signed in. */
+/** Avatar menu: discover, orders, returns, favorites, more, sign out. Green dot = signed in. */
 export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
   const router = useRouter();
   const theme = useTheme();
@@ -80,6 +90,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
 
   const menuCounts = useMemo(
     (): Record<MenuKey, number> => ({
+      discover: 0,
       orders: orders.length,
       returns: returnRequestCount,
       favorites: 0,
@@ -90,6 +101,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
 
   const activeKey = useMemo((): MenuKey | null => {
     const leaf = segments[segments.length - 1];
+    if (leaf === "swipe") return "discover";
     if (leaf === "orders") return "orders";
     if (leaf === "returns") return "returns";
     if (leaf === "favorites") return "favorites";
@@ -101,7 +113,11 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
     (item: MenuItem) => {
       setMenuOpen(false);
       if (activeKey === item.key) return;
-      router.push(item.href);
+      if (item.replace) {
+        router.replace(item.href);
+      } else {
+        router.push(item.href);
+      }
     },
     [activeKey, router],
   );
@@ -186,7 +202,7 @@ export function CustomerHeaderActions({ avatarSize = 40 }: Props) {
 
             {SHOPPER_MENU.map((item) => {
               const active = activeKey === item.key;
-              const showCount = item.key !== "more";
+              const showCount = item.key !== "more" && item.key !== "discover";
               const count = showCount ? menuCounts[item.key] : 0;
               const capped = count > 99 ? "99+" : String(count);
               const a11yLabel = showCount

@@ -1,6 +1,7 @@
 import { Alert, FlatList, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { CartEmptyState } from "@/components/CartEmptyState";
 import { CartItemRow } from "@/components/CartItemRow";
 import { CustomerHeaderActions } from "@/components/CustomerHeaderActions";
 import { PressableScale } from "@/components/PressableScale";
@@ -12,6 +13,7 @@ import {
   setCartLineQtyRemote,
 } from "@/lib/cart-remote";
 import { isSupabaseConfigured } from "@/lib/is-supabase-configured";
+import { STATUS_ERROR, statusBadgeStyle } from "@/lib/status-colors";
 import { useCartStore } from "@/stores/cart-store";
 import { useTheme } from "@/theme/ThemeContext";
 
@@ -24,6 +26,7 @@ export default function CartScreen() {
   const removeItem = useCartStore((s) => s.removeItem);
   const clearCart = useCartStore((s) => s.clearCart);
   const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
+  const emptyCartBadge = statusBadgeStyle(STATUS_ERROR, theme.scheme);
 
   async function removeLineFromCart(listingId: string) {
     if (isSupabaseConfigured()) {
@@ -42,7 +45,7 @@ export default function CartScreen() {
       try {
         await clearMyServerCart();
       } catch (e) {
-        Alert.alert("Could not clear cart", (e as Error).message);
+        Alert.alert("Could not empty cart", (e as Error).message);
         return;
       }
     }
@@ -56,7 +59,7 @@ export default function CartScreen() {
         "Connect Supabase in .env to reserve inventory on swipes and allocate on checkout.",
         [
           {
-            text: "Clear cart",
+            text: "Empty the cart",
             style: "destructive",
             onPress: () => {
               clearCart();
@@ -98,91 +101,66 @@ export default function CartScreen() {
 
   return (
     <Screen>
-      {/* Header */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: 20,
+          gap: 12,
         }}
       >
-        <View style={{ gap: 4 }}>
-          <ThemedText variant="headline">Your Cart</ThemedText>
-          {itemCount > 0 && (
+        <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
+          <ThemedText variant="headline" numberOfLines={1}>
+            Your Cart
+          </ThemedText>
+          {itemCount > 0 ? (
             <ThemedText variant="caption" color="muted">
               {itemCount} item{itemCount !== 1 ? "s" : ""}
             </ThemedText>
-          )}
+          ) : null}
         </View>
 
         <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-          {items.length > 0 && (
+          {items.length > 0 ? (
             <PressableScale
-              accessibilityLabel="Clear cart"
+              accessibilityLabel="Empty the cart"
               onPress={() =>
-                Alert.alert("Clear cart?", "Remove all items?", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Clear", style: "destructive", onPress: () => void clearEntireCart() },
-                  { text: "Clear", style: "destructive", onPress: () => void clearEntireCart() },
-                ])
+                Alert.alert(
+                  "Empty the cart?",
+                  "All items will be removed from your cart.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Empty the cart",
+                      style: "destructive",
+                      onPress: () => void clearEntireCart(),
+                    },
+                  ],
+                )
               }
               style={{
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: theme.radius.sm,
+                minHeight: 44,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                justifyContent: "center",
+                borderRadius: theme.radius.pill,
                 borderWidth: 1,
-                borderColor: "#EF4444",
+                borderColor: emptyCartBadge.borderColor,
+                backgroundColor: emptyCartBadge.backgroundColor,
               }}
             >
-              <ThemedText variant="caption" style={{ color: "#EF4444" }}>
-                Clear
+              <ThemedText variant="label" style={{ color: STATUS_ERROR }}>
+                Empty cart
               </ThemedText>
             </PressableScale>
-          )}
-
-          <PressableScale
-            accessibilityLabel="Go back"
-            onPress={() => router.back()}
-            style={{
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: theme.radius.sm,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}
-          >
-            <ThemedText variant="caption">← Back</ThemedText>
-          </PressableScale>
-
+          ) : null}
           <CustomerHeaderActions />
         </View>
       </View>
 
       {items.length === 0 ? (
-        /* Empty state */
-        <View style={{ flex: 1, justifyContent: "center", gap: 14 }}>
-          <ThemedText variant="headline">Nothing here yet</ThemedText>
-          <ThemedText variant="body" color="muted">
-            Swipe right on listings you love and set the quantity — they'll
-            appear here.
-          </ThemedText>
-          <PressableScale
-            accessibilityLabel="Start swiping"
-            onPress={() => router.back()}
-            style={{
-              alignSelf: "flex-start",
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.primary,
-            }}
-          >
-            <ThemedText variant="label" color="onPrimary">
-              Start swiping
-            </ThemedText>
-          </PressableScale>
-        </View>
+        <CartEmptyState onBrowseDiscover={() => router.replace("/(customer)/swipe")} />
       ) : (
         <>
           <FlatList
@@ -231,6 +209,7 @@ export default function CartScreen() {
                 Checkout · ${(totalCents / 100).toFixed(2)}
               </ThemedText>
             </PressableScale>
+
           </View>
         </>
       )}

@@ -186,14 +186,6 @@ export default function SignInScreen() {
     }
   }
 
-  function handleBackPress() {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace("/");
-  }
-
   const isLight     = theme.scheme === "light";
   const compact     = height < 780;
   const ctaDisabled = loading || !formValid;
@@ -215,22 +207,6 @@ export default function SignInScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.backRow}>
-          <PressableScale
-            accessibilityLabel="Back"
-            onPress={handleBackPress}
-            style={[
-              styles.backBtn,
-              {
-                backgroundColor:
-                  theme.scheme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.04)",
-              },
-            ]}
-          >
-            <Ionicons name="chevron-back" size={20} color={theme.colors.textPrimary} />
-          </PressableScale>
-        </View>
-
         <ScrollView
           contentContainerStyle={[styles.content, compact && styles.contentCompact]}
           keyboardShouldPersistTaps="handled"
@@ -409,16 +385,7 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  backRow:        { paddingHorizontal: 20, paddingTop: 8 },
-  backBtn:        {
-    alignSelf: "flex-start",
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content:        { paddingHorizontal: 24, paddingBottom: 32 },
+  content:        { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32 },
   contentCompact: { paddingBottom: 20 },
   logoWrap:       { alignItems: "center", marginTop: 16, marginBottom: 28 },
   logoWrapCompact:{ marginTop: 6, marginBottom: 16 },
